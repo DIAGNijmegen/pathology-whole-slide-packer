@@ -1,2 +1,58 @@
 # pathology-whole-slide-packer
-extracts tissue sections from one or multiple whole slide images and combines them into a single new slide removing excess white space
+
+Packs tissue sections from one or several slides into a single new slide removing excessive background.
+Requires ASAP (https://github.com/computationalpathologygroup/ASAP), openslide and the wholeslidedata package.
+Can also pack the corresponding slide annotations.
+
+The first step is to create tissue masks to separate background from foreground.
+They can be create using the `create_tissue_masks` script. The script was adapted from https://github.com/PingjunChen/tissueloc/blob/master/tissueloc/locate_tissue.py
+(Pingjun Chen, MIT License, 2018) and uses otsu thresholding. The tissue masks are saved in one-channel tif format 
+with 0=background, 1=tissue (not readable by openslide as it can't read one-channel tifs).
+You can create your own background masks as normal images, and convert them to tifs with this script from wholeslidedata:
+`wholeslidedata/accessories/asap/convert_image.py`.
+
+After creating the tissue masks, the script `pack_slides.py` will do the packing.
+
+**Example**: We pack this small slide with one ASAP annotaton (in green):
+
+<img src="documentation/assets/example_anno.jpg" style="width:410px;">
+
+First, we create the tissue mask:
+```
+python3 create_tissue_masks.py --wsi=../documentation/assets/example.tif \
+--spacing=2 --min_area=0 --out_dir=./out/tissue_masks --overwrite
+```
+We set here `min_area` (mm²) to zero to also include the smaller fragment, which would be otherwise ignored.
+Now, with the created tissue mask (example_tissue.tif), we can pack the slide.
+
+Output:
+
+<img src="./documentation/assets/example_tissue_mask.jpg" style="width:400px;">
+
+Now we pack both tissue fragments together:
+```
+python3 pack_slides.py --data=../documentation/assets --mask_dir=./out/tissue_masks \
+--anno_dir=../documentation/assets --level=0 --min_area=0 --out_dir=./out/packed_example --overwrite
+```
+This will create several directories containing the packed slide, correpsonding tissue mask
+and annotation. Here the packed slide with the corresponding annotation:
+
+<img src="documentation/assets/example_packed_anno.jpg" style="width:165px;">
+
+--------------------------
+
+The packing script has two input modes: directory mode and configuration mode.
+In the directory mode, `data` is the directory with the slides and `mask_dir` the directory with
+the background slides. The names of the masks should start with the corresponding slide names (same for the annotations)
+
+In the configuration mode, `data` is a csv with at least the columns `name`, `path` and `mask_path`
+specifying the name of the packed slide to create, the pathes of the slides to be packed and their masks.
+This allows to pack multiple slides into one (same name). The packing can be done at any spacing or level present in the slides, 
+i.e. `spacing` or `level`. The results will be written to `out_dir`. It will also create convenient symbolic links to open the slides
+with ASAP (unless `nolinks` flag is supplied). You can specify a `cache_dir` for 
+intermediate files and an input `anno_dir` with ASAP annotation xmls. These will be then packed together with the slides. 
+
+If annotations for the original slides are created after the slides have been packed, you can use the script `pack_annos`.
+It expects the original images and annotations and the packed images - directories as input.
+
+More documentation and examples coming soon.
