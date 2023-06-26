@@ -1,7 +1,8 @@
 # pathology-whole-slide-packer
 
 Packs tissue sections from one or several slides into a single new slide removing excessive background.
-Requires ASAP (https://github.com/computationalpathologygroup/ASAP), openslide and the wholeslidedata package.
+Requires ASAP (https://github.com/computationalpathologygroup/ASAP), openslide and the wholeslidedata package 
+(https://github.com/DIAGNijmegen/pathology-whole-slide-data).
 Can also pack the corresponding slide annotations.
 
 The first step is to create tissue masks to separate background from foreground.
@@ -13,7 +14,8 @@ You can create your own background masks as normal images, and convert them to t
 
 After creating the tissue masks, the script `pack_slides.py` will do the packing.
 
-**Example**: We pack this small slide with one ASAP annotaton (in green):
+## Example
+We pack this small slide with one ASAP annotaton (in green):
 
 <img src="documentation/assets/example_anno.jpg" style="width:410px;">
 
@@ -39,7 +41,7 @@ and annotation. Here the packed slide with the corresponding annotation:
 
 <img src="documentation/assets/example_packed_anno.jpg" style="width:165px;">
 
---------------------------
+## Description
 
 The packing script has two input modes: directory mode and configuration mode.
 In the directory mode, `data` is the directory with the slides and `mask_dir` the directory with
@@ -56,3 +58,6 @@ If annotations for the original slides are created after the slides have been pa
 It expects the original images and annotations and the packed images - directories as input.
 
 More documentation and examples coming soon.
+
+## Acknowledgments
+Created in the [#EXAMODE](https://www.examode.eu) project.
