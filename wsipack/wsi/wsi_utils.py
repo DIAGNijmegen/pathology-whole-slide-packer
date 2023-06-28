@@ -314,10 +314,8 @@ def create_thumbnail(path, out_path, overwrite=False, format='JPEG', openslide=F
     return write_arr_as_image(thumbnail, out_path, format=format)
 
 
-def write_arr_as_image(arr, out_path, format=format):
+def write_arr_as_image(arr, out_path, format='JPEG'):
     print(out_path)
-    # plt.imshow(thumbnail)
-    # plt.show()
 
     if arr.shape[-1]==1:
         arr = arr.squeeze()
@@ -327,8 +325,7 @@ def write_arr_as_image(arr, out_path, format=format):
             print('dtype of mask not uint, but %s!' % str(arr.dtype))
         #mask
     im = Image.fromarray(arr).convert('RGB')
-    im.save(out_path, format, quality=80)
-    # raise ValueError('exp')
+    im.save(str(out_path), format, quality=80)
     return True
 
 if __name__ == '__main__':
