@@ -138,19 +138,3 @@ def create_pathes_csv(dir, ending='tif'):
     out_path = Path(dir)/'pathes.csv'
     df.to_csv(str(out_path), index=False)
     print(str(out_path))
-
-if __name__ == '__main__':
-
-    # parser = ArgumentParser(description='Copy files from a list.')
-    # parser.add_argument('--file_list', type=str, help='Path to the file containing the list of file names')
-    # parser.add_argument('--src_dir', type=str, help='Source directory where the files are located')
-    # parser.add_argument('--tar_dir', type=str, help='Destination directory where the files will be copied')
-    # parser.add_argument('--dry_run', action='store_true')
-    # args = vars(parser.parse_args())
-    # copy_files_from_list(**args)
-
-    # copy_files_from_lists(src_dir="/projects/0/examode/data/lung/catania/images",
-    #                       tar_dir="/projects/0/examode/data/lung/catania/images_selection",
-    #                       files_list_dir="/projects/0/examode/experiments/wsi_experiments/tmp/download_catania",
-    #                       dry_run=False)
-    pass

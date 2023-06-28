@@ -3,9 +3,6 @@ from pathlib import Path
 
 import cv2
 
-from skimage.transform import resize
-from skimage import img_as_bool
-
 from wsipack.utils.cool_utils import ensure_dir_exists
 from wsipack.utils.path_utils import PathUtils, get_corresponding_pathes_dirs
 from wsipack.utils.flexparse import FlexArgumentParser
@@ -51,8 +48,6 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
             mask -= 1
             mask[mask<0] = 0
 
-        # mask = resize(mask, shape).squeeze()
-        # resized = img_as_bool(mask).squeeze()
         mask = cv2.resize(mask, (shape[1], shape[0]))
         # from dptshared.cool_utils import showim
         # showim(mask)

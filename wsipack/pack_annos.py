@@ -130,41 +130,25 @@ def _pack_anno(anno_path, roi_anno_path, packed_anno_path, wsi_spacing, packed_s
 
     spacing_factor = wsi_spacing/packed_spacing
     #read annos etc.
-    # anno2 = Annotation()
-    # anno2.open(str(anno_path))
     anno = AsapAnno(anno_path)
 
     #the info is also in packed_anno in the name, but the overlap code uses annos,
     #so instead of converting the name into rectangle-anno just use the roi_anno
-    # roi_anno2 = Annotation()
-    # roi_anno2.open(str(roi_anno_path))
     roi_anno = AsapAnno(roi_anno_path)
-
-    # packed_anno2 = Annotation()
-    # packed_anno2.open(str(packed_anno_path))
     packed_anno = AsapAnno(packed_anno_path)
 
-    # packed_slides_rois_map = get_annos_by_group(packed_anno) #group=packed slide
-    # packed_roi_annos = packed_slides_rois_map[wsi_name]
     packed_roi_annos = packed_anno.get_annos_in_group(wsi_name)
 
     all_found_annos = []
     for packed_roi in packed_roi_annos:
-        # orig_roi2 = get_anno_by_name(roi_anno, packed_roi['name'])#roi in the original corresponding to the packed
         orig_roi = roi_anno.get_anno_by_name(packed_roi.name)
-        # found_annos2 = get_annos_overlapping_with(anno2, orig_roi2)
         found_annos = anno.get_annos_overlapping_with(orig_roi)
         all_found_annos.extend(found_annos)
 
-        # shift0 = orig_roi['coordinates'][0]
         shift0 = orig_roi.coords[0]
-        # shift_anno_items(found_annos, -shift0[0], -shift0[1])
         anno.shift_annos(found_annos, -shift0[0], -shift0[1])
-        # scale_anno_items(found_annos, spacing_factor)
         anno.scale_annos(found_annos, spacing_factor)
-        # shiftXY = packed_roi['coordinates'][0]
         shiftXY = packed_roi.coords[0]
-        # shift_anno_items(found_annos, shiftXY[0], shiftXY[1])
         anno.shift_annos(found_annos, shiftXY[0], shiftXY[1])
 
     # unmatched_annos = [anno_item for anno_item in anno.annotations if anno_item not in all_found_annos]
@@ -173,10 +157,8 @@ def _pack_anno(anno_path, roi_anno_path, packed_anno_path, wsi_spacing, packed_s
     if len(unmatched_annos)>0:
         print('%d/%d annos out of rois!!' % (len(unmatched_annos), len(all_found_annos)))
         unma_anno = deepcopy(anno)
-        # remove_anno_items(unma_anno, all_found_annos)
         unma_anno.remove_annos(all_found_annos)
         #remove from the (packed) anno
-        # remove_anno_items(anno, unmatched_annos)
         anno.remove_annos(unmatched_annos)
 
     return anno, unma_anno

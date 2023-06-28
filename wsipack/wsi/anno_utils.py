@@ -27,6 +27,8 @@ def rgb2hex(r,g,b):
 def print_el(el):
     print(etree.tostring(el, pretty_print=True, encoding="unicode"))
 
+### Class for ASAP Annotations #######
+
 class AnnoGroup(object):
     default_color = "#FF0000"
     #<AnnotationGroups>

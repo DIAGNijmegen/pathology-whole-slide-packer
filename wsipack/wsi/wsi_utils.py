@@ -328,6 +328,29 @@ def write_arr_as_image(arr, out_path, format='JPEG'):
     im.save(str(out_path), format, quality=80)
     return True
 
+def read_patch_from_arr(arr, row, col, height, width):
+    """ simulate reading a patch form the slide, but using its content array (handles border-cases)
+        assumes hwc, pads with zeros on the lower/top for left/top-border (negative row/col) and
+        on right/bottom for right/bottom-border.
+    """
+    arr_height = arr.shape[0]; arr_width = arr.shape[1]
+    if row < 0 or col < 0 or row+height > arr_height or col+width > arr_width:
+        if len(arr.shape)>2:
+            patch = np.zeros((height, width, arr.shape[2]), dtype=arr.dtype)
+        else:
+            patch = np.zeros((height, width), dtype=arr.dtype)
+        left_pad = 0
+        if row < 0:
+            left_pad = -row
+        top_pad = 0
+        if col < 0:
+            top_pad = -col
+        read_patch = arr[row+left_pad:row+height, col+top_pad:col+width]
+        patch[left_pad:left_pad+read_patch.shape[0],top_pad:top_pad+read_patch.shape[1]] = read_patch
+    else:
+        patch = arr[row:row+height, col:col+width]
+    return patch
+
 if __name__ == '__main__':
     # arr = np.array([[1, 2, 4],[5, 3, 6]])
     # scaled = upscale(arr, 2)
