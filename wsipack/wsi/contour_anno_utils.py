@@ -113,7 +113,7 @@ def write_anno_for_contours(contours, anno_path=None, wsi_path=None, names=None,
             if contour.shape[0] >= 3:
                 # todo check for rects 'rectangle'
                 target_type = 'polygon'
-                annotation.add_polygon(name, group, coords=contour.astype(np.float), color=anno_colors[group])
+                annotation.add_polygon(name, group, coords=contour.astype(float), color=anno_colors[group])
                 # annotation.add(annotation=target_type, coordinates=contour.astype(np.float), name=name,
                 #                group=group, color=anno_colors[group])
             else:

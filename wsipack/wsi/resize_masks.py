@@ -27,7 +27,7 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
     print('processing %s' % str(mask_path))
     mreader = ImageReader(mask_path, spacing_tolerance=spacing_tolerance)
     try:
-        found_spacing = mreader.refine(spacing)
+        mask_spacing = mreader.refine(spacing)
         print('spacing %.2f already present in mask %s, skipping' % (spacing, str(mask_path)))
         if str(mask_path)!=str(out_path):
             print('copying %s' % str(out_path))
@@ -53,6 +53,8 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
         # showim(mask)
         print('writing %s...' % str(out_path))
         write_array(mask, out_path, spacing)
+        mask_spacing = spacing
+    return mask_spacing
 
 def resize_masks(mask_dir, wsi_dir, out_dir, spacing, suffix='tif', overwrite=False, **kwargs):
     if ',' in suffix:

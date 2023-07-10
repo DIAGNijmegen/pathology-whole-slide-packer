@@ -10,7 +10,11 @@ import sys
 from pathlib import Path
 
 from scipy.ndimage import binary_fill_holes
-from skimage import filters, img_as_ubyte
+from skimage import filters
+try:
+    from skimage import img_as_ubyte
+except:
+    from skimage.util import img_as_ubyte
 from skimage.morphology import remove_small_objects
 import cv2
 

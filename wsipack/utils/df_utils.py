@@ -288,7 +288,7 @@ def df_to_excel(df, path, sheet_name='Sheet1', index=False, max_width=60, overwr
     if path.exists() and not overwrite:
         raise ValueError('%s already exists' % str(path))
     mkdir(path.parent)
-    writer = pd.ExcelWriter(str(path))
+    writer = pd.ExcelWriter(str(path), engine='openpyxl')
     df.to_excel(writer, sheet_name=sheet_name, index=index)
 
     for column in df:
@@ -299,7 +299,11 @@ def df_to_excel(df, path, sheet_name='Sheet1', index=False, max_width=60, overwr
             writer.sheets[sheet_name].set_column(col_idx, col_idx, column_length)
         except:
             pass
-    writer.save()
+    try:
+        writer.save()
+    except:
+        #new version doesnt seem to have save, instead just close
+        writer.close()
 
 def df_read(path):
     path = str(path)

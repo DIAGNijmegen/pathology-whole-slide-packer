@@ -112,21 +112,25 @@ def _create_slide_arr(packed_height, packed_width, cache_dir, name='slide_arr.da
 
 
 def _upscale_masks(wsi_name_path_map, wsi_name_mask_map, mask_spacing, cache_dir, spacing_tolerance=0.3):
-    """" if mask spacing is not present (too low), upscales the mask and copyies them to cache_dir """
+    """" if mask spacing is not present (too low), upscales the mask and copyies them to cache_dir
+     return map name->mask_spacing """
     if cache_dir is None:
         print('not upscaling masks since cache_dir is None')
         ensure_dir_exists(cache_dir)
+    mask_spacings_map = {}
     for name,mpath in wsi_name_mask_map.copy().items():
         mreader = ImageReader(mpath, spacing_tolerance=spacing_tolerance)
         try:
-            mreader.refine(mask_spacing)
+            mask_spacing = mreader.refine(mask_spacing)
         except PixelSpacingLevelError as ex:
             print('upsaling %s to spacing %f' % (str(mpath), mask_spacing))
             cdir = Path(cache_dir)/'tissue_masks'
             ensure_dir_exists(cdir)
             cpath = cdir/Path(mpath).name
-            resize_mask(mpath, wsi_name_path_map[name], out_path=cpath, spacing=mask_spacing, spacing_tolerance=spacing_tolerance)
+            mask_spacing = resize_mask(mpath, wsi_name_path_map[name], out_path=cpath, spacing=mask_spacing, spacing_tolerance=spacing_tolerance)
             wsi_name_mask_map[name] = str(cpath)
+        mask_spacings_map[name] = mask_spacing
+    return mask_spacings_map
 
 def _get_tissue_masks_out_dir(out_dir, masks_out_dir=None, tissue_masks_dir_name='tissue_masks'):
     if masks_out_dir is None:
@@ -203,9 +207,10 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         lock_path.touch()
         path_unlinker = ExitHandler.instance().add_path_unlinker(lock_path)
 
-    _upscale_masks(wsi_name_path_map, wsi_name_mask_map, mask_spacing, cache_dir, spacing_tolerance=spacing_tolerance)
+    mask_spacing_map = _upscale_masks(wsi_name_path_map, wsi_name_mask_map, mask_spacing, cache_dir, spacing_tolerance=spacing_tolerance)
 
-    out_to_mask_factor = spacing/mask_spacing
+    # out_to_mask_factor = spacing/mask_spacing
+    out_to_mask_factor = spacing/max(mask_spacing_map.values())
     processing_to_mask_factor = processing_spacing/mask_spacing
     try:
         cache_wsi_dir = Path(cache_dir)/out_name
