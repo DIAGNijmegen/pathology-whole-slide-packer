@@ -1,3 +1,5 @@
+from bisect import bisect_left
+
 from typing import List, Tuple
 
 import shutil
@@ -6,12 +8,25 @@ from pathlib import Path
 
 from matplotlib import pyplot as plt
 import numpy as np
-from wholeslidedata.accessories.asap.imagewriter import WholeSlideMaskWriter, WholeSlideImageWriter, \
-    WholeSlideImageWriterBase
-from wholeslidedata.image.utils import take_closest_level
+try: #0.0.16
+    from wholeslidedata.accessories.asap.imagewriter import WholeSlideMaskWriter, WholeSlideImageWriter, \
+        WholeSlideImageWriterBase
+except:
+    from wholeslidedata.interoperability.asap.imagewriter import WholeSlideMaskWriter, WholeSlideImageWriter, \
+        WholeSlideImageWriterBase
 from wholeslidedata.image.wholeslideimage import WholeSlideImage
 
 from wsipack.utils.cool_utils import showims, take_closest_smallest_numer, mkdir, timer
+
+def take_closest_level(spacings, spacing):
+    pos = bisect_left(spacings, spacing)
+    if pos == 0:
+        return pos
+    if pos == len(spacings):
+        return pos - 1
+    if spacings[pos] - spacing < spacing - spacings[pos - 1]:
+        return pos
+    return pos - 1
 
 class PixelSpacingLevelError(Exception):
     """Raise when there is no level for the spacing within the tolerance."""
@@ -58,8 +73,8 @@ class ImageReader(WholeSlideImage):
 
     def content(self, spacing):
         content = self.get_slide(spacing)
-        # content = np.swapaxes(content, 0, 1)
-        content = self._mask_convert(content)
+        # TODO: check openslide compatibility
+        # content = self._mask_convert(content)
         return content
 
     def shape(self, spacing):
@@ -93,8 +108,9 @@ class ImageReader(WholeSlideImage):
     #     patch = self.get_patch(col, row, height, width, spacing, center=False, relative=True)
     def read(self, spacing, row, col, height, width):
         patch = self.get_patch(col, row, width, height, spacing, center=False, relative=True)
-        patch = self._mask_convert(patch)
+        # patch = self._mask_convert(patch)
         # return patch.transpose([1,0,2])
+        patch = patch.squeeze()
         return patch
 
     def refine(self, spacing):
@@ -129,7 +145,6 @@ class ArrayImageWriter(object):
     def __init__(self, cache_dir=None, tile_size=512, suppress_mir_stdout=True, skip_empty=False, jpeg_quality=80):
         self.cache_dir = cache_dir
         self.tile_size = tile_size
-        self.tile_shape = (tile_size, tile_size)
         self.suppress_mir_stdout = suppress_mir_stdout
         self.skip_empty = skip_empty
         self.jpeg_quality = jpeg_quality
@@ -137,10 +152,12 @@ class ArrayImageWriter(object):
     def write_array(self, arr, path, spacing, verbose=False):
         from ..wsi.wsi_utils import write_array_with_writer
         tile_size = self.tile_size
-        tile_shape = self.tile_shape
         if min(arr.shape[:2]) < tile_size:
             tile_size = take_closest_smallest_numer([8, 16, 32, 64, 128, 256], min(arr.shape[:2]))
+        if len(arr.shape)==2:
             tile_shape = (tile_size, tile_size)
+        else:
+            tile_shape = (tile_size, tile_size, arr.shape[2])
         if arr.dtype == bool:
             arr = arr.astype(np.uint8)
 
@@ -177,6 +194,7 @@ class WsdWriterWrapper(object):
         self.writer = writer
 
     def write(self, tile, row, col):
+        tile = tile.squeeze()
         self.writer.write_tile(tile, (col, row))
 
     def close(self):

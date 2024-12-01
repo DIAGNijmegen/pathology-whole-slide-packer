@@ -103,7 +103,11 @@ def _create_slide_arr(packed_height, packed_width, cache_dir, name='slide_arr.da
     else:
         cache_path = str(Path(cache_dir)/name)
         print('creating slide_array... %s' % cache_path)
-        slide_arr = np.memmap(cache_path, dtype=dtype, mode='w+', shape=(packed_height, packed_width, dims))
+        if dims==1:
+            shape =(packed_height, packed_width)
+        else:
+            shape =(packed_height, packed_width, dims)
+        slide_arr = np.memmap(cache_path, dtype=dtype, mode='w+', shape=shape)
         print('filling slide array..')
         if fill is not None:
             slide_arr.fill(fill)
@@ -140,7 +144,7 @@ def _get_tissue_masks_out_dir(out_dir, masks_out_dir=None, tissue_masks_dir_name
 
 
 def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name=None, masks_out_dir=None, cache_dir='./cache',
-               processing_spacing=4, mask_spacing=2, min_area=0.2, tile_size=512, overwrite=False, orig_anno_dir=None,
+               processing_spacing=4, mask_spacing=2, min_area=0.1, tile_size=512, overwrite=False, orig_anno_dir=None,
                packed_anno_dir=None, tissue_masks_dir_name='tissue_masks',
                box_margin=1, thumbnails=True, multiproc=False,  mem_slide=False,
                spacing_tolerance=0.3, clear_locks=False, mask_label=None, nolinks=False,
