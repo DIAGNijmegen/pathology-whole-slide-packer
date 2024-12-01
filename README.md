@@ -19,22 +19,20 @@ We pack this small slide with one ASAP annotaton (in green):
 
 <img src="documentation/assets/example_anno.jpg" style="width:410px;">
 
-First, we create the tissue mask:
+First, we create the tissue mask using basic thresholding:
 ```
-python3 create_tissue_masks.py --wsi=../documentation/assets/example.tif \
+python3 wsipack/create_tissue_masks.py --wsi=documentation/assets/example.tif \
 --spacing=2 --min_area=0 --out_dir=./out/tissue_masks --overwrite
 ```
 We set here `min_area` (mm²) to zero to also include the smaller fragment, which would be otherwise ignored.
-Now, with the created tissue mask (example_tissue.tif), we can pack the slide.
-
-Output:
+The output is a pyramidal image (tif) of the background/foreground:
 
 <img src="./documentation/assets/example_tissue_mask.jpg" style="width:400px;">
 
-Now we pack both tissue fragments together:
+Now, with the created tissue mask (example_tissue.tif), we can pack the slide:
 ```
-python3 pack_slides.py --data=../documentation/assets --mask_dir=./out/tissue_masks \
---anno_dir=../documentation/assets --level=0 --min_area=0 --out_dir=./out/packed_example --overwrite
+python3 wsipack/pack_slides.py --data=documentation/assets --mask_dir=./out/tissue_masks \
+--anno_dir=documentation/assets --level=0 --min_area=0 --out_dir=./out/packed_example --overwrite
 ```
 This will create several directories containing the packed slide, correpsonding tissue mask
 and annotation. Here the packed slide with the corresponding annotation:
