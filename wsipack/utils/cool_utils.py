@@ -51,7 +51,7 @@ def is_int(obj):
     return isinstance(obj, (int, np.integer))
 
 def is_float(obj):
-    return isinstance(obj, (float, np.float))
+    return isinstance(obj, (float, float))
 
 def is_string_or_path(obj):
     return isinstance(obj, (str, Path))
@@ -199,12 +199,9 @@ def ensure_dir_exists(path):
 def mkdir(path):
     return ensure_dir_exists(path)
 
-def ensure_dirs_exist(*pathes):
+def mkdirs(*pathes):
     for path in pathes:
-        if len(path)==1: #only one path?
-            ensure_dir_exists(path)
-            break
-        ensure_dir_exists(path)
+        mkdir(path)
 
 def path_exists(path):
     return Path(path).exists()
@@ -1355,21 +1352,21 @@ def multiproc_pool(fct, kwargs, n_workers_min=2):
     return results
 
 from concurrent.futures import ProcessPoolExecutor
-def multiproc_pool2(fct, kwargs, n_workers_min=2, verbose=True):
+def multiproc_pool2(fct, kwargs, cpus=2, verbose=True):
+    if cpus<=1:
+        return sequential_pool(fct, kwargs)
+
     start_time = time.time()
     if not is_string(fct):
         modul = fct.__module__
     fct = modul+'.'+fct.__name__
-    n_cpus = max(n_workers_min,count_docker_cpus())
-    # pool = multiprocessing.Pool(processes=n_cpus)
-    # pool = ProcessPoolExecutor(max_workers=n_cpus)
     for kwarg in kwargs:
         kwarg['_function'] = fct
-    print('Starting ProcessPoolExecutor with function %s, %d workers on %d args' % (fct, n_cpus, len(kwargs)), flush=True)
+    print('Starting ProcessPoolExecutor with function %s, %d workers on %d args' % (fct, cpus, len(kwargs)), flush=True)
 
     if verbose: run_est = RunEst(n_tasks=len(kwargs), start=True)
     results = []
-    with ProcessPoolExecutor(max_workers=n_cpus) as pool:
+    with ProcessPoolExecutor(max_workers=cpus) as pool:
         results_iter = pool.map(multiproc_wrapper, kwargs)
         for result in results_iter:
             results.append(result)

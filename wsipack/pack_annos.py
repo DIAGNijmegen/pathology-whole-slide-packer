@@ -49,7 +49,7 @@ def pack_annos(annos_dir, packed_images_dir, wsi_dir_or_pathes, out_dir=None, ou
 
     packed_anno_dir = Path(packed_dir)/'tissue_anno'
     # packed_anno_dir = Path(packed_dir)/'images_packed_anno' #obsolete
-    orig_anno_dir = Path(packed_dir)/'raw_tissue_anno'
+    orig_anno_dir = Path(packed_dir)/'orig_tissue_anno'
     # orig_anno_dir = Path(packed_dir)/'images_orig_anno' #obsolete
 
     packed_roi_anno_pathes = PathUtils.list_pathes(packed_anno_dir, ending='xml')

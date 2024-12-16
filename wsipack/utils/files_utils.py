@@ -131,10 +131,11 @@ def copy_files_from_lists(files_list_dir, src_dir, tar_dir, dry_run=False, **kwa
         copy_files_from_list(fl, src_dir=src_dir, tar_dir=tar_dir, dry_run=dry_run, **kwargs)
     print('Done')
 
-def create_pathes_csv(dir, ending='tif'):
+def create_pathes_csv(dir, ending='tif', out_path=None):
     pathes = PathUtils.list_pathes(dir, ending=ending, ret='str', sort=True)
     names = [Path(p).stem for p in pathes]
     df = pd.DataFrame(dict(name=names, path=pathes))
-    out_path = Path(dir)/'pathes.csv'
+    if out_path is None:
+        out_path = Path(dir)/'pathes.csv'
     df.to_csv(str(out_path), index=False)
     print(str(out_path))

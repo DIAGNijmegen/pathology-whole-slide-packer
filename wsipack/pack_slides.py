@@ -70,29 +70,6 @@ def _create_wsi_reader(wsi_path, spacing, cache_dir='./cache', spacing_tolerance
     # todo cache
     reader = ImageReader(wsi_path, spacing_tolerance=spacing_tolerance)
     wsi_out_spacing = reader.refine(spacing)
-
-    # try:
-    #     wsi_out_spacing = reader.refine(spacing)
-    # except PixelSpacingLevelError as ex:
-    #     spacing0 = reader.spacings[0]
-    #     reader.close()
-    #     if spacing0 > spacing:
-    #         raise ValueError('%s with min spacing %.2f > required spacing %.2f' % \
-    #               (Path(wsi_path).name, spacing0, spacing))
-    #     else:
-    #         try:
-    #             from digitalpathology.image.processing.zoom_my import save_image_at_level_my, zoom_image, \
-    #                 save_image_at_level
-    #             smaller_spacing = reader.refine(spacing/2) #throws error if not present
-    #             # missing spacing
-    #             wsi_work_path = Path(cache_dir)/(Path(wsi_path).stem+'_converted.tif')
-    #             print('converting to %s due to missing spacing...' % str(wsi_work_path))
-    #             save_image_at_level(wsi_path, str(wsi_work_path), level=0, pixel_spacing=None, spacing_tolerance=0.25,
-    #                                 jpeg_quality=80, overwrite=False)
-    #             reader = ImageReader(str(wsi_work_path), spacing_tolerance=spacing_tolerance)
-    #         except:
-    #             raise ValueError('%s with min spacing %.2f > required spacing %.2f' % \
-    #                              (Path(wsi_path).name, spacing0, spacing))
     return reader
 
 
@@ -101,6 +78,7 @@ def _create_slide_arr(packed_height, packed_width, cache_dir, name='slide_arr.da
     if mem_slide:
         slide_arr = np.ones((packed_height, packed_width, 3), dtype=np.uint8) * fill
     else:
+        mkdir(cache_dir)
         cache_path = str(Path(cache_dir)/name)
         print('creating slide_array... %s' % cache_path)
         if dims==1:
@@ -116,17 +94,16 @@ def _create_slide_arr(packed_height, packed_width, cache_dir, name='slide_arr.da
 
 
 def _upscale_masks(wsi_name_path_map, wsi_name_mask_map, mask_spacing, cache_dir, spacing_tolerance=0.3):
-    """" if mask spacing is not present (too low), upscales the mask and copyies them to cache_dir
+    """" if mask spacing is not present (too low), upscales the mask and copies them to cache_dir
      return map name->mask_spacing """
-    if cache_dir is None:
-        print('not upscaling masks since cache_dir is None')
-        ensure_dir_exists(cache_dir)
     mask_spacings_map = {}
     for name,mpath in wsi_name_mask_map.copy().items():
         mreader = ImageReader(mpath, spacing_tolerance=spacing_tolerance)
         try:
             mask_spacing = mreader.refine(mask_spacing)
         except PixelSpacingLevelError as ex:
+            if cache_dir is None: raise ValueError('upscale masks requires cache_dir')
+            mkdir(cache_dir)
             print('upsaling %s to spacing %f' % (str(mpath), mask_spacing))
             cdir = Path(cache_dir)/'tissue_masks'
             ensure_dir_exists(cdir)
@@ -143,19 +120,17 @@ def _get_tissue_masks_out_dir(out_dir, masks_out_dir=None, tissue_masks_dir_name
 
 
 
-def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name=None, masks_out_dir=None, cache_dir='./cache',
-               processing_spacing=4, mask_spacing=2, min_area=0.1, tile_size=512, overwrite=False, orig_anno_dir=None,
-               packed_anno_dir=None, tissue_masks_dir_name='tissue_masks',
-               box_margin=1, thumbnails=True, multiproc=False,  mem_slide=False,
+def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name=None, cache_dir=None,
+               processing_spacing=4, mask_spacing=4, min_area=0.01, tile_size=512, overwrite=False, orig_anno_dir=None,
+               packed_anno_dir=None, tissue_masks_dir_name='tissue_masks', packed_dir_name='packed',
+               box_margin=1, thumbnails=True, mem_slide=False,
                spacing_tolerance=0.3, clear_locks=False, mask_label=None, nolinks=False,
                # out_format='tif', writer='asap'
                ):
     # if writer not in ['asap','pyvips']:
     #     raise ValueError('unkonwn writer %s' % writer)
     # is_tif = 'tif' in out_format
-    # if multiproc:
-    #     sleep(random.uniform(0,2)) #starting at sime time might cause problems with accessing same slides
-    if spacing is None:
+    if spacing is None: #take the spacing from the first slide
         reader = ImageReader(wsi_pathes[0])
         spacing = reader.spacings[level]
         reader.close()
@@ -168,14 +143,14 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
     #4. create xml-annos for the rectangles for the original and packed slide
     #group is the slide name, anno name is top_left, bottom_right
 
-    masks_out_dir = _get_tissue_masks_out_dir(out_dir, masks_out_dir, tissue_masks_dir_name)
+    masks_out_dir = Path(out_dir)/tissue_masks_dir_name
 
     if orig_anno_dir is None:
         # orig_anno_dir = str(out_dir)+'_orig_anno'
-        orig_anno_dir = str(Path(out_dir).parent/'raw_tissue_anno')
+        orig_anno_dir = str(Path(out_dir)/'orig_tissue_anno')
     if packed_anno_dir is None:
-        packed_anno_dir = str(Path(out_dir).parent/'tissue_anno')
-    ensure_dirs_exist(out_dir, orig_anno_dir, packed_anno_dir)
+        packed_anno_dir = str(Path(out_dir)/'tissue_anno')
+    mkdirs(out_dir, orig_anno_dir, packed_anno_dir)
     orig_anno_links_dir = orig_anno_dir+'_links'
     packed_anno_links_dir = packed_anno_dir+'_links'
 
@@ -191,7 +166,8 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         else:
             out_name = wsi_names[0]
 
-    out_path = Path(out_dir)/out_name
+    out_path = Path(out_dir)/packed_dir_name/out_name
+    mkdir(out_path.parent)
     if not str(out_path).endswith('tif'):
         out_path = Path(str(out_path)+'.tif')
 
@@ -211,15 +187,14 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         lock_path.touch()
         path_unlinker = ExitHandler.instance().add_path_unlinker(lock_path)
 
+    if cache_dir is None:
+        cache_dir = Path(out_dir)/'cache'
     mask_spacing_map = _upscale_masks(wsi_name_path_map, wsi_name_mask_map, mask_spacing, cache_dir, spacing_tolerance=spacing_tolerance)
 
     # out_to_mask_factor = spacing/mask_spacing
     out_to_mask_factor = spacing/max(mask_spacing_map.values())
     processing_to_mask_factor = processing_spacing/mask_spacing
     try:
-        cache_wsi_dir = Path(cache_dir)/out_name
-        ensure_dir_exists(cache_wsi_dir)
-
         skipped_bad_sp = []
         ensure_dir_exists(out_dir)
         readers = []
@@ -231,7 +206,7 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         for wsi_name in wsi_names:
             wsi_path = wsi_name_path_map[wsi_name]
             print('packing %s' % wsi_path)
-            reader = _create_wsi_reader(wsi_path, spacing, cache_wsi_dir, spacing_tolerance=spacing_tolerance)
+            reader = _create_wsi_reader(wsi_path, spacing, cache_dir=cache_dir, spacing_tolerance=spacing_tolerance)
             readers.append(reader)
             wsi_out_spacing = reader.refine(spacing)
 
@@ -288,6 +263,7 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         packed_height, packed_width = _determine_slide_size(packed_boxes_out_sp, tile_size) # determine out slide shape
 
         #wsi-reader coordinates are in array-format, opencv is in image-format
+        cache_wsi_dir = Path(cache_dir)/out_name
         slide_arr = _create_slide_arr(packed_height, packed_width, cache_wsi_dir, mem_slide=mem_slide)
         print('process %d boxes...' % len(packed_boxes_out_sp))
         runtimer = RunEst(n_tasks=len(packed_boxes_out_sp), print_fct=print)
@@ -363,13 +339,13 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         # make_asap_link(wsi_path, mask_path=None, anno_path=orig_anno_path, links_dir=orig_anno_links_dir)
 
         if thumbnails:
-            thumb_dir = str(out_dir) + '_thumbnails'
+            thumb_dir = Path(out_dir)/'thumbnails'
             ensure_dir_exists(thumb_dir)
             thumb_path = Path(thumb_dir)/(Path(cache_out_path).stem+'.jpg')
             create_thumbnail(cache_out_path, thumb_path, overwrite=True, openslide=False)
 
         print('copying packed slide %s to %s' % (str(cache_out_path), out_dir))
-        shutil.copyfile(str(cache_out_path), str(Path(out_dir)/Path(cache_out_path).name))
+        shutil.copyfile(str(cache_out_path), str(out_path))
 
         print('write masks to %s' % str(masks_out_dir))
         ensure_dir_exists(masks_out_dir)
@@ -451,6 +427,7 @@ def _pack_boxes(all_boxes, size_diff_factor = 0.5):
     print('rpack packed size:', packed_size)
 
     print('trying to enforce rectangle size...')
+    counter=0
     for sdf in np.arange(size_diff_factor, 0.96, 0.05):
         # asymmetry_factor = min(packed_size)/max(packed_size)
         # if asymmetry_factor < sdf:
@@ -463,8 +440,8 @@ def _pack_boxes(all_boxes, size_diff_factor = 0.5):
             print('corrected packed size:', packed_size)
             break
         except rpack.PackingImpossibleError as ex:
-            print('enforcing unsuccessfull')
-    print('final size', packed_size)
+            counter+=1
+    print('final size after %d trials' % counter, packed_size)
     return box_sizes, positions
 
 
@@ -541,14 +518,15 @@ def _pack_slide_wrapper(wsi_pathes, **kwargs):
     except:
         return str(wsi_pathes)+str(sys.exc_info())
 
-def pack_slides(data, out_dir, packed_name_col='name', out_dir_name='packed', path_col='path', mask_col='mask_path',
-                mask_dir=None, random_order=False, multiproc=False, cpus=0, overwrite=False, tissue_masks_dir_name = 'tissue_masks',
+def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='packed', path_col='path', mask_col='mask_path',
+                mask_dir=None, random_order=False, cpus=0, overwrite=False, tissue_masks_dir_name='tissue_masks',
                 check_previous_params=False, cache_dir=None,
                 anno_dir=None, anno_out_dir=None, anno_out_dir_prefix=None, **kwargs):
     """ slide_pack_mapping: either csv-path or df with cols for packed_name, wsi path and optionally mask path """
+    out_dir = Path(out_dir)
     if cache_dir is None:
-        cache_dir = Path(out_dir)/'cache'
-    out_dir_packed = str(Path(out_dir)/out_dir_name)
+        cache_dir = out_dir/'cache'
+    out_dir_packed = out_dir/packed_dir_name
     param_info = ParamInfo(out_dir, filename='pack_args.yaml', overwrite=not check_previous_params)
     param_info.save(**kwargs)
 
@@ -577,7 +555,7 @@ def pack_slides(data, out_dir, packed_name_col='name', out_dir_name='packed', pa
     all_wsi_pathes = list(df[path_col])
 
     if mask_col not in df:
-        if mask_dir is None:
+        if mask_dir is None: #TODO: just throw an error
             mask_dirs = []
             wsi_dirs = [str(Path(p).parent) for p in df.path]
             wsi_dirs = list(set(wsi_dirs))
@@ -632,9 +610,9 @@ def pack_slides(data, out_dir, packed_name_col='name', out_dir_name='packed', pa
             continue
         # print('pack_slide kwargs', kwargs)
         pack_params = dict(wsi_pathes=list(wsi_pathes_group), mask_pathes=list(mask_pathes_group),
-                    # out_format=out_format, writer=writer,
+                    packed_dir_name=packed_dir_name,
                     tissue_masks_dir_name=tissue_masks_dir_name, cache_dir=cache_dir,
-                    out_dir=out_dir_packed, out_name=str(packed_name), overwrite=overwrite, multiproc=multiproc, **kwargs)
+                    out_dir=out_dir, out_name=str(packed_name), overwrite=overwrite, **kwargs)
         all_pack_params.append(pack_params)
 
     if random_order:
@@ -643,20 +621,7 @@ def pack_slides(data, out_dir, packed_name_col='name', out_dir_name='packed', pa
 
     print('packing %d slides to %d' % (len(df), n_packed))
 
-    #determining cpus automatically might not work, therefore here explicitly
-    if cpus:
-        multiproc = True
-        cpus = max(2, cpus)
-        print('multiproc with %d cpus' % cpus)
-    else:
-        cpus = 2
-    if multiproc and len(all_pack_params)>1:
-        results = multiproc_pool2(_pack_slide_wrapper, all_pack_params, n_workers_min=cpus)
-    else:
-        results = []
-        for pack_params in tqdm(all_pack_params):
-            result_str = _pack_slide_wrapper(**pack_params)
-            results.append(result_str)
+    results = multiproc_pool2(_pack_slide_wrapper, all_pack_params, cpus=cpus)
 
     failures = [r for r in results if r!='ok']
     if len(skipped)>0:
@@ -667,15 +632,14 @@ def pack_slides(data, out_dir, packed_name_col='name', out_dir_name='packed', pa
 
     if len(all_pack_params)>0 and len(failures)==0:
         if check_packed(out_dir_packed):
-            create_slides_info_summary(out_dir_packed, overwrite=True)
-            create_slides_info_summary(_get_tissue_masks_out_dir(out_dir_packed, kwargs.get('masks_out_dir',None)),
-                                   overwrite=True)
+            create_slides_info_summary(out_dir_packed, out_dir=out_dir/'slide_summary', overwrite=True)
+            create_slides_info_summary(out_dir/tissue_masks_dir_name, overwrite=True)
 
     if anno_dir is not None:
         pack_annos(anno_dir, out_dir_packed, all_wsi_pathes,
                    out_dir=anno_out_dir, out_dir_prefix=anno_out_dir_prefix, overwrite=overwrite)
 
-    create_pathes_csv(out_dir_packed)
+    create_pathes_csv(out_dir_packed, out_path=out_dir/'pathes.csv')
     if cache_dir is not None:
         try:  os.rmdir(str(cache_dir));
         except: pass
@@ -723,13 +687,12 @@ def main():
     parser.add_argument('--spacing', type=float, required=False)
     parser.add_argument('--level', type=int, required=False)
     parser.add_argument('--processing_spacing', type=float, required=False, default=4, help='spacing at which the tissue is detected, 4 or 8 recommended')
-    parser.add_argument('--mask_spacing', type=float, required=False, default=2)
+    parser.add_argument('--mask_spacing', type=float, required=False, default=4)
     parser.add_argument('--min_area', type=float, required=False, default=0.4, help='min section tissue area in mm2')
     parser.add_argument('--cache_dir', type=str, required=False, help='defaults to out_dir/cache')
     parser.add_argument('--anno_dir', type=str, required=False, default=None, help='annotations belonging to the slides to be packed')
     parser.add_argument('--sleep', type=int, default=0, required=False, help='for debugging, letting the docker sleep before doing anything')
     parser.add_argument('--overwrite', action='store_true', help='overwrite existing results')
-    parser.add_argument('--multiproc', action='store_true', help='multiprocessing')
     parser.add_argument('--cpus', type=int, required=False, default=0, help='for multiproc')
     parser.add_argument('--random_order', action='store_true', help='random order of processing')
     # parser.add_argument('--writer', type=str, required=False, default='asap', choices=['asap','pyvips'])
