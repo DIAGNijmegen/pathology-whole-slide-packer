@@ -269,9 +269,12 @@ def _write_tissue_mask(mask, spacing, out_path):
     writer = ArrayImageWriter()
     writer.write_array(mask, out_path, spacing=spacing)
 
-def create_tissue_masks(slide_dir, out_dir, spacing=4, level=None, wsi_suffix='tif', out_suffix='_tissue', **kwargs):
+def create_tissue_masks(slide_dir, out_dir, spacing=4, level=None, wsi_suffix=['tif', 'tiff', 'svs', 'ndpi', 'mrxs'],
+                        out_suffix='_tissue', **kwargs):
     slide_pathes = PathUtils.list_pathes(slide_dir, ending=wsi_suffix)
     print('creating %d tissue masks' % len(slide_pathes))
+    if len(slide_pathes) == 0:
+        print('no slides found in %s with suffix %s' % (str(slide_dir), str(wsi_suffix)))
     if out_suffix is None:
         out_suffix = ''
     for sp in tqdm(slide_pathes):
