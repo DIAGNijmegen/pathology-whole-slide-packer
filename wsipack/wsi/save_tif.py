@@ -39,11 +39,11 @@ def _process_args(args):
     print('create tissue masks with args:', args)
 
     wsi = args.pop('wsi')
-    wsi_suffix = args.pop('suffix',None)
     out_dir = args.pop('out_dir')
     mkdir(out_dir)
     if Path(wsi).is_dir():
-        pathes = PathUtils.list_pathes(wsi, ending=wsi_suffix)
+        pathes = PathUtils.list_pathes(wsi, ending=['tif','tiff','ndpi','mrxs','svs','dcom','dicom'])
+        print('found %d slides' % len(pathes))
         for path in pathes:
             out_path = Path(out_dir)/(Path(wsi).stem+'.tif')
             save_tif(path, out_path=out_path, **args)
@@ -59,7 +59,6 @@ def main():
     parser.add_argument("--out_dir", help="Output directory for the tissue masks", required=True)
     parser.add_argument("--spacing", type=float, help="spacing in um/px (if not level)", required=False)
     parser.add_argument("--level", type=int, help="level (if not spacing)", required=False)
-    parser.add_argument("--suffix", default="tif,tiff,svs,ndpi,mrxs,dicom", help="suffix of slides in slide_dir", required=False)
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing files")
 
     args = vars(parser.parse_args())
