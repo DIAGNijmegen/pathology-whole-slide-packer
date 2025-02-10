@@ -45,7 +45,7 @@ def _process_args(args):
         pathes = PathUtils.list_pathes(wsi, ending=['tif','tiff','ndpi','mrxs','svs','dcom','dicom'])
         print('found %d slides' % len(pathes))
         for path in pathes:
-            out_path = Path(out_dir)/(Path(wsi).stem+'.tif')
+            out_path = Path(out_dir)/(Path(path).stem+'.tif')
             save_tif(path, out_path=out_path, **args)
     else:
         print('convert single slide %s' % wsi)
