@@ -141,6 +141,43 @@ class ImageReader(WholeSlideImage):
             pos = take_closest_level(self.spacings, spacing)
             return self.spacings[pos]
 
+class ImageWriter(object):
+    def __init__(self, path, spacing, shape, tile_size, quality=80):
+        self.path = path
+        self.spacing = spacing
+        self.shape = shape
+        self.tile_size = tile_size
+        self.quality = quality
+
+        self.writer = None
+
+    def write(self, patch, row, col):
+        self._init_writer(patch)
+
+        if len(patch.shape) == 2:
+            patch = patch[:, :, None]
+
+        self.writer.write_tile(patch, (col, row))
+
+    def _init_writer(self, patch):
+        if self.writer is None:
+            kwargs = {}
+            if 'int' in str(patch.dtype):
+                if len(patch.shape) == 3 and patch.shape[-1] == 3:
+                    self.writer = WholeSlideImageWriter()
+                    kwargs['jpeg_quality'] = self.quality
+                    kwargs['interpolation'] = 'linear'
+                else:
+                    self.writer = WholeSlideMaskWriter()
+            else:
+                self.writer = WholeSlideMaskWriter()
+
+            self.writer.write(self.path, dimensions=self.shape[:2][::-1], spacing=self.spacing,
+                              tile_shape=(self.tile_size, self.tile_size), **kwargs)
+
+    def close(self):
+        self.writer.finishImage()
+
 class ArrayImageWriter(object):
     def __init__(self, cache_dir=None, tile_size=512, suppress_mir_stdout=True, skip_empty=False, jpeg_quality=80):
         self.cache_dir = cache_dir
