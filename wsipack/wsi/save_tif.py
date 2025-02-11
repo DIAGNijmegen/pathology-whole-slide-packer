@@ -26,7 +26,8 @@ def save_tif(path, out_path, spacing=None, level=None, tile_size=512, quality=80
 
     shape = reader.shape(spacing)
     writer = ImageWriter(out_path, shape=(shape[0],shape[1]), spacing=spacing, quality=quality, tile_size=tile_size)
-    print('writing shape %s at spacing %.2fto %s' % (str(shape), spacing, path))
+    print('writing %s with shape %s at spacing %.2f to %s' %\
+          (Path(path).name, str(shape), spacing, out_path))
     for x in tqdm(range(0, shape[0], tile_size)):
         for y in range(0, shape[1], tile_size):
             tile = reader.read(spacing=spacing, row=y, col=x, width=tile_size, height=tile_size)
