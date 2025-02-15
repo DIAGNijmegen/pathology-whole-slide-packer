@@ -270,7 +270,7 @@ def _write_tissue_mask(mask, spacing, out_path):
     writer.write_array(mask, out_path, spacing=spacing)
 
 def create_tissue_masks(slide_dir, out_dir, spacing=4, level=None, wsi_suffix=['tif', 'tiff', 'svs', 'ndpi', 'mrxs'],
-                        out_suffix='_tissue', **kwargs):
+                        out_suffix='_tissue', ignore_err=True, **kwargs):
     slide_pathes = PathUtils.list_pathes(slide_dir, ending=wsi_suffix)
     print('creating %d tissue masks' % len(slide_pathes))
     if len(slide_pathes) == 0:
@@ -279,6 +279,14 @@ def create_tissue_masks(slide_dir, out_dir, spacing=4, level=None, wsi_suffix=['
         out_suffix = ''
     for sp in tqdm(slide_pathes):
         out_path = Path(out_dir)/(sp.stem+out_suffix+'.tif')
+        try:
+            create_tissue_mask(sp, out_path=out_path, spacing=spacing, level=level, **kwargs)
+        except Exception as e:
+            print('failed %s' % str(sp))
+            if ignore_err:
+                print(e)
+            else:
+                raise e
         create_tissue_mask(sp, out_path=out_path, spacing=spacing, level=level, **kwargs)
     print('Done!')
 
@@ -306,6 +314,7 @@ def main():
     parser.add_argument("--wsi_suffix", default="tif,svs,ndpi,mrxs,dicom", help="suffix of slides in slide_dir", required=False)
     parser.add_argument("--out_suffix", default="_tissue", help="suffix for the created masks", required=False)
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing files")
+    parser.add_argument("--ignore_err", action="store_true", help="Ignore errors")
 
     args = vars(parser.parse_args())
 
