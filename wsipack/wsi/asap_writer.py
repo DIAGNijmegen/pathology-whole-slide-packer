@@ -37,7 +37,7 @@ class WholeSlideImageWriterBase(Writer, MultiResolutionImageWriter):
 
     def _write_tile_to_image(self, tile, coordinates):
         if coordinates:
-            col, row = self._get_col_row(coordinates)
+            col, row = self._get_x_y(coordinates)
             if col is not None and row is not None:
                 self.writeBaseImagePartToLocation(
                     tile.flatten().astype("uint8"), col, row
@@ -45,7 +45,7 @@ class WholeSlideImageWriterBase(Writer, MultiResolutionImageWriter):
         else:
             self.writeBaseImagePart(tile.flatten().astype("uint8"))
 
-    def _get_col_row(self, coordinates):
+    def _get_x_y(self, coordinates):
         x, y = coordinates
         if x < self._dimensions[0] and x >= 0 and y < self._dimensions[1] and y >= 0:
             return x, y

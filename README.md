@@ -1,16 +1,14 @@
 # pathology-whole-slide-packer
 
 Packs tissue sections from one or several slides into a single new slide removing excessive background.
-Requires ASAP (https://github.com/computationalpathologygroup/ASAP), openslide and the wholeslidedata package 
-(https://github.com/DIAGNijmegen/pathology-whole-slide-data).
-Can also pack the corresponding slide annotations.
+Requires ASAP (https://github.com/computationalpathologygroup/ASAP) and openslide.
+Can also pack the corresponding slide annotations in ASAP xml format.
 
 The first step is to create tissue masks to separate background from foreground.
 They can be create using the `create_tissue_masks` script. The script was adapted from https://github.com/PingjunChen/tissueloc/blob/master/tissueloc/locate_tissue.py
 (Pingjun Chen, MIT License, 2018) and uses otsu thresholding. The tissue masks are saved in a pyramidal tif format 
 with 0=background, 1=tissue (not readable by openslide as it can't read one-channel tifs).
-You can create your own background masks as normal images, and convert them to tifs with this script from wholeslidedata:
-`wholeslidedata/accessories/asap/convert_image.py`.
+You can create your own background masks as normal images, and convert them to tifs with `convert_image` (see below).
 
 After creating the tissue masks, the script `pack_slides.py` will do the packing.
 
@@ -55,7 +53,25 @@ intermediate files and an input `anno_dir` with ASAP annotation xmls. These will
 If annotations for the original slides are created after the slides have been packed, you can use the script `pack_annos`.
 It expects the original images and annotations and the packed images - directories as input.
 
-More documentation and examples coming soon.
+## Convert non-pyramidal images and masks to pyramidal
+
+tif mode — convert image to pyramidal tif:
+```
+python -m wsipack.convert_image tif --data <path> --out_dir <dir> --spacing <float>
+```
+
+mask mode — convert mask image using slide spacing:
+```
+python -m wsipack.convert_image mask --data <path> --out_dir <dir> --slide_dir <dir>
+python -m wsipack.convert_image mask --data masks.csv --out_dir <dir> --slide_col slide_path
+```
+
+Input types (via `--data`, same pattern as `pack_slides.py`):
+- Single file: `/path/to/image.png`
+- Directory: scans for images (png, jpg, jpeg, bmp, tif, tiff)
+- CSV/XLSX: reads paths from columns (`--path_col`, default `"path"`)
+
 
 ## Acknowledgments
 Created in the [#EXAMODE](https://www.examode.eu) project.
+
