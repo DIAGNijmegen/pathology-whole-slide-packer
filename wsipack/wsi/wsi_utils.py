@@ -1,13 +1,11 @@
 from PIL import Image
 from scipy.ndimage import zoom
 
-from wsipack.wsi.wsd_image import ImageReader
+from wsipack.wsi.asap_writer import ArrayImageWriter
 from wsipack.utils.asap_links import make_asap_link
 from wsipack.utils.cool_utils import *
-from wsipack.utils.io_utils import move_file, copy_from_to
+from wsipack.wsi.wsi_read import ImageReader, create_reader
 
-def px_to_um2(px, spacing):
-    return px*(spacing**2)
 
 def write_array_with_writer(array, writer, tile_size=512, close=True):
     if array.dtype==np.float16:
@@ -38,7 +36,6 @@ def write_array_with_writer(array, writer, tile_size=512, close=True):
 
 
 def write_wsi_heatmap(hm, out_path, slide_spacing, wsi, links_dir, shift, anno_path=None, overwrite=False):
-    from ..wsi.wsd_image import ImageReader, write_array
     if Path(out_path).exists() and not overwrite:
         print('not overwriting %s' % str(out_path))
         return out_path
@@ -69,7 +66,7 @@ def write_wsi_heatmap(hm, out_path, slide_spacing, wsi, links_dir, shift, anno_p
         # hm = upscale(hm, zoom_factor)
         print('zoomed by %d to %s' % (zoom_factor, str(hm.shape)))
         out_spacing = slide_spacing * (shift / zoom_factor)
-        wsi_shape = wsi.get_shape_from_spacing(out_spacing)
+        wsi_shape = wsi.shape(out_spacing)
         hm = hm[:wsi_shape[0], :wsi_shape[1]]
 
     if close:
@@ -80,8 +77,7 @@ def write_wsi_heatmap(hm, out_path, slide_spacing, wsi, links_dir, shift, anno_p
 
     # cam_result = cam_result[1:, 1:]  # otherwise doesnt work in asap for some reason...
     print('writing array with spacing %f' % out_spacing)
-
-    write_array(hm, out_path, out_spacing)
+    ArrayImageWriter().write_array(hm, out_path, out_spacing)
     if links_dir is not None:
         print('make asap links...')
         mask_path = out_path
@@ -104,7 +100,6 @@ def write_wsi_heatmap(hm, out_path, slide_spacing, wsi, links_dir, shift, anno_p
 
 def write_salient_patches(wsi, sal_result, slide_spacing, out_dir, patch_size, shift, n_examples=9, n_cols=3, percentile=99.9,
                           read_spacing=0.5, sal_result2=None, overwrite=False):
-    #wsi: from dptshared.wsi.wsd_image import ImageReader
     if n_examples==0: return
 
     # out_dir = str(Path(out_path).parent)+'_example_patches'
@@ -208,66 +203,6 @@ def upscale(arr, factor):
     return scaled
 
 
-def move_slide(old_path, new_path, dry_run=False, **kwargs):
-    old_path = Path(old_path)
-    new_path = Path(new_path)
-
-    if 'mrxs' in old_path.suffix:
-        old_folder = old_path.parent/old_path.stem
-        new_folder = new_path.parent/new_path.stem
-        move_file(old_folder, new_folder, dry_run=dry_run, **kwargs)
-    move_file(old_path, new_path, dry_run=dry_run, **kwargs)
-
-def delete_slide(path):
-    print('deleting %s' % str(path))
-    path = Path(path)
-    if path.exists():
-        path.unlink()
-
-    if path.suffix in ['.mrxs', 'mrxs']:
-        dirpath = str(path).replace('.mrxs','')
-        if Path(dirpath).exists():
-            print('deleting %s' % str(dirpath))
-            shutil.rmtree(path=dirpath)
-
-def copy_slide_to(path, out_dir):
-    out_path = Path(out_dir)/Path(path).name
-    return copy_slide(path, out_path)
-
-def copy_slide(path, out_path):
-    copy_from_to(path, out_path)
-    if str(path).endswith('.mrxs'):
-        slide_dir = str(path)[:-5]
-        out_dir_path = Path(out_path).parent/Path(slide_dir).name
-        copy_from_to(slide_dir, out_dir_path)
-    return out_path
-
-def move_slides_map(dir_ending_map, rename_map, ignore_missing=False, dry_run=False, verbose=False, **kwargs):
-    """ dir_ending_map: {img_dir:suffix}, rename_map: {old:new}  """
-    missing = []
-    for img_dir, ending in dir_ending_map.items():
-        print('renaming in %s' % img_dir)
-        for old_name, new_name in rename_map.items():
-            old_path = Path(img_dir)/(old_name+ending)
-            new_path = Path(img_dir)/(new_name+ending)
-            if not old_path.exists():
-                missing.append(old_path)
-            else:
-                move_slide(old_path, new_path, dry_run=dry_run, ignore_missing=ignore_missing, **kwargs)
-    print('%d missing files' % len(missing))
-    if len(missing)>0 and verbose:
-        print(missing)
-    return missing
-
-def move_slides(old_pathes, new_pathes, dry_run=False, **kwargs):
-    print('moving %d slides' % len(old_pathes))
-    if len(old_pathes)!=len(new_pathes):
-        raise ValueError('different number of pathes: %d old, but %d new' % (len(old_pathes), len(new_pathes)))
-    for op, np in tqdm(zip(old_pathes, new_pathes)):
-        move_slide(op, np, dry_run=dry_run, **kwargs)
-
-
-
 def find_thumbnail_level(shapes, max_pix=1024 * 1024):
     """ gets the level and shape with the largest resolution < 1500 in all dimensions,
     returns the level and the smallest shape"""
@@ -293,7 +228,7 @@ def create_thumbnail(path, out_path, overwrite=False, format='JPEG', openslide=F
 
     print(str(path))
     try:
-        reader = ImageReader(str(path), backend='openslide' if openslide else 'asap')
+        reader = create_reader(str(path), reader='openslide' if openslide else 'asap')
     except:
         print("failed opening %s: %s" % (str(path), str(sys.exc_info())))
         return False

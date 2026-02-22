@@ -118,7 +118,8 @@ class PathUtils(object):
         return PathUtils.list_pathes(roots, ending=ending, **kwargs)
 
     @staticmethod
-    def list_pathes(roots, containing=None, containing_or=None, containing_and=None, not_containing=None, ending=None, ret='path', sort=False, ignore_dots=True,
+    def list_pathes(roots, containing=None, containing_or=None, containing_and=None, not_containing=None,
+                    ending=None, ret='path', sort=False, ignore_dots=True,
                     type='all', split_commas=True, ssh_node=None, depth=1):
         """ type: all, file, dir
         ret: ['path', 'str', 'name', 'stem'] """

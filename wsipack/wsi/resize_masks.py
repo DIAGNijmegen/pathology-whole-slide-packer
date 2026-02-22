@@ -1,14 +1,14 @@
 import shutil, tqdm
 from pathlib import Path
+import numpy as np
 
 import cv2
 
 from wsipack.utils.cool_utils import ensure_dir_exists
 from wsipack.utils.path_utils import PathUtils, get_corresponding_pathes_dirs
 from wsipack.utils.flexparse import FlexArgumentParser
-import numpy as np
-
-from .wsd_image import ImageReader, write_array
+from wsipack.wsi.asap_writer import ArrayImageWriter
+from wsipack.wsi.wsi_read import ImageReader, create_reader
 
 
 def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=False, spacing_tolerance=0.3):
@@ -25,7 +25,7 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
 
 
     print('processing %s' % str(mask_path))
-    mreader = ImageReader(mask_path, spacing_tolerance=spacing_tolerance)
+    mreader = create_reader(mask_path, spacing_tolerance=spacing_tolerance)
     try:
         mask_spacing = mreader.refine(spacing)
         print('spacing %.2f already present in mask %s, skipping' % (spacing, str(mask_path)))
@@ -34,7 +34,7 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
             shutil.copyfile(str(mask_path), str(out_path))
     except:
         #spacing not present - resize
-        reader = ImageReader(wsi_path, spacing_tolerance=spacing_tolerance)
+        reader = create_reader(wsi_path, spacing_tolerance=spacing_tolerance)
         spacing = reader.refine(spacing)
         lev = reader.level(spacing)
         shape = reader.shapes[lev]
@@ -52,7 +52,7 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
         # from dptshared.cool_utils import showim
         # showim(mask)
         print('writing %s...' % str(out_path))
-        write_array(mask, out_path, spacing)
+        ArrayImageWriter().write_array(mask, out_path, spacing)
         mask_spacing = spacing
     return mask_spacing
 

@@ -51,7 +51,7 @@ def is_int(obj):
     return isinstance(obj, (int, np.integer))
 
 def is_float(obj):
-    return isinstance(obj, (float, float))
+    return isinstance(obj, (float, np.floating))
 
 def is_string_or_path(obj):
     return isinstance(obj, (str, Path))
@@ -129,7 +129,7 @@ def list_intersetion_rest(lst1, lst2, verbose=False, left_title='list1', right_t
     l1_surp = [v for v in lst1 if v not in inters]
     l2_surp = [v for v in lst2 if v not in inters]
     if verbose:
-        print('% inters, %d l1-surplus, %d l2-surplus' % (len(inters), len(lst1), len(lst2)))
+        print('%d inters, %d l1-surplus, %d l2-surplus' % (len(inters), len(lst1), len(lst2)))
         if len(inters): print('intersection:', str(inters))
         if len(l1_surp): print(left_title+' surplus:', str(l1_surp))
         if len(l2_surp): print(right_title+' surplus:', str(l2_surp))
@@ -241,7 +241,7 @@ def take_closest_larger_number(l, number):
     filtered = [num for num in l if num >= number]
     if not filtered:
         return None
-    return take_closest_larger_number(filtered, number)
+    return min(filtered)
 
 def take_closest_number_index(l, number):
     closest = take_closest_number(l, number)
@@ -266,7 +266,7 @@ class DictObject(object):
     def __getitem__(self, key):
         if self.callback is not None:
             self.callback(key)
-        return self.__dict__.__getitem__(self, key)
+        return self.__dict__[key]
 
 class Dict(dict):
     def __init__(self, *args, **kwargs):
@@ -725,16 +725,6 @@ def invert_dict_non_unique(d):
                 value_key_map[value].append(key)
     return value_key_map
 
-def invert_dict_non_unique(d):
-    "input: key->val, keys unique, vals not unique, returns val->[keys]"
-    values = list(set(d.values()))
-    value_key_map = defaultdict(list)
-    for value in values:
-        for key, v in d.items():
-            if value==v:
-                value_key_map[value].append(key)
-    return value_key_map
-
 
 #https://stackoverflow.com/questions/6190331/how-to-implement-an-ordered-default-dict
 class DefaultOrderedDict(collections.OrderedDict):
@@ -924,16 +914,6 @@ def print_env_info(verbose=True):
         import numpy
         print('numpy version', numpy.__version__)
 
-
-def take_closest_smallest_numer(l, number):
-    l = sorted(l)
-    l = l+[l[-1]] #so that the loop doesnt have to handle the last number in list
-    for i,val in enumerate(l):
-        if val > number:
-            if i==0:
-                raise ValueError('no value in %s is smaller then %s' % (str(l), str(number)))
-            break
-    return l[i-1]
 
 def _test_dict_nested_flatten():
     d = {'a':{'x':1, 'y':{23874:2}}}
@@ -1512,6 +1492,11 @@ def string_empty(text):
     return text is None or (is_string(text) and is_empty(text)) or (not is_string(text) and np.isnan(text))
 
 
+def take_closest_smaller_number(l, number):
+    smaller = [x for x in l if x <= number]
+    if not smaller:
+        raise ValueError(f'no value in {l} is smaller or equal to {number}')
+    return max(smaller)
 
 if __name__ == '__main__':
     pass

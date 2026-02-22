@@ -7,8 +7,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+from wsipack.utils.cool_utils import mkdir
 from wsipack.utils.path_utils import PathUtils
-from wsipack.wsi.wsd_image import *
+from wsipack.wsi.asap_writer import AsapWriter
+from wsipack.wsi.wsi_read import create_reader
 
 
 def save_tif(path, out_path, spacing=None, level=None, tile_size=512, quality=80, overwrite=False):
@@ -18,20 +20,20 @@ def save_tif(path, out_path, spacing=None, level=None, tile_size=512, quality=80
     if Path(out_path).exists() and not overwrite:
         print('%s already exists' % str(out_path))
         return
-    reader = ImageReader(path)
+    reader = create_reader(path)
     if level is not None:
-        spacing = reader.spacings[0]
+        spacing = reader.spacings[level]
     else:
         spacing = reader.refine(spacing)
 
     shape = reader.shape(spacing)
-    writer = ImageWriter(out_path, shape=(shape[0],shape[1]), spacing=spacing, quality=quality, tile_size=tile_size)
+    writer = AsapWriter(out_path, shape=(shape[0],shape[1]), spacing=spacing, jpeg_quality=quality, tile_size=tile_size)
     print('writing %s with shape %s at spacing %.2f to %s' %\
           (Path(path).name, str(shape), spacing, out_path))
     for x in tqdm(range(0, shape[0], tile_size)):
         for y in range(0, shape[1], tile_size):
-            tile = reader.read(spacing=spacing, row=y, col=x, width=tile_size, height=tile_size)
-            writer.write(tile, row=y, col=x)
+            tile = reader.read(spacing=spacing, x=x, y=y, width=tile_size, height=tile_size)
+            writer.write(tile, x=x, y=y)
     print('finalizing image...')
     writer.close()
     print('Done %s' % str(path), flush=True)
@@ -51,7 +53,7 @@ def _process_args(args):
     else:
         print('convert single slide %s' % wsi)
         out_path = Path(out_dir)/(Path(wsi).stem+'.tif')
-        save_tif(slide_path=wsi, out_path=out_path, **args)
+        save_tif(path=wsi, out_path=out_path, **args)
 
 
 def main():

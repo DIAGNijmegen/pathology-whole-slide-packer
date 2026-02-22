@@ -8,10 +8,10 @@ from wsipack.utils.df_utils import print_df
 from wsipack.utils.path_utils import *
 import functools
 from wsipack.wsi.contour_utils import dist_to_px
+from wsipack.wsi.wsi_read import ImageReader, create_reader
 
 print = functools.partial(print, flush=True)
 
-from wsipack.wsi.wsd_image import ImageReader
 import xml.etree.ElementTree as ET
 
 try:
@@ -352,7 +352,7 @@ class AsapAnno(object):
                                type='Polygon', coords=coords, color=color))
 
     def convert_points_to_boxes_um(self, distance, wsi_path, **kwargs):
-        reader = ImageReader(wsi_path)
+        reader = create_reader(wsi_path)
         spacing = reader.spacings[0]
         reader.close()
         px = dist_to_px(distance, spacing)
@@ -449,11 +449,11 @@ def scale_anno_coords(anno_path, out_path, factor=None, wsi_path=None, spacing=N
             raise ValueError('requires wsi_path if spacing is to be used')
         if not Path(wsi_path).exists():
             raise ValueError('wsi %s doesnt exist' % str(wsi_path))
-    reader = ImageReader(wsi_path)
+    reader = create_reader(wsi_path)
     spacing = reader.refine(spacing)
     factor = reader.spacings[0]/spacing
     reader.close()
-    if not (factor*100)//2:
+    if not (factor*100)%2:
         print('warn: factor %.3f for %s not //2' % (factor, Path(wsi_path).stem))
 
     ensure_dir_exists(Path(out_path).parent)
@@ -584,18 +584,8 @@ def rename_anno(anno_path, out_path, name_map, strip=True, overwrite=False):
 
 def rename_annos_in(anno_dir, out_dir, name_map, **kwargs):
     ensure_dir_exists(out_dir)
-    anno_pathes = pathes_in(anno_dir, ending='xml')
+    anno_pathes = PathUtils.list_pathes(anno_dir, ending='xml')
     print('renaming %d annotations' % len(anno_pathes))
     for ap in tqdm(anno_pathes):
         rename_anno(ap, Path(out_dir) / ap.name, name_map, **kwargs)
     print('Done!')
-
-def auto_add_groups(anno):
-    groups = anno.groups
-    if groups is None: groups = {}
-    for a in anno.annotations:
-        group = a['group']
-        if str(group)!='None':
-            group = groups[group]
-            group['color'] = a['color']
-

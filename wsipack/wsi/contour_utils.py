@@ -8,7 +8,8 @@ import cv2 as cv
 import numpy as np
 from scipy.spatial.distance import cdist
 
-from wsipack.wsi.wsd_image import ImageReader
+from wsipack.wsi.wsi_read import ImageReader, create_reader
+
 
 def find_contours(arr, only_outer=True, convex=False):
     if only_outer:
@@ -60,7 +61,7 @@ def cmp_shape_spacing_factor(wsi_path, spacing):
     #     wsi = wsi_path
     #     close_reader = False
     if isinstance(wsi_path, (str, Path)):
-        wsi = ImageReader(str(wsi_path))
+        wsi = create_reader(str(wsi_path))
         close_reader = True
     else:
         wsi = wsi_path

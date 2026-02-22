@@ -7,7 +7,7 @@ Can also pack the corresponding slide annotations.
 
 The first step is to create tissue masks to separate background from foreground.
 They can be create using the `create_tissue_masks` script. The script was adapted from https://github.com/PingjunChen/tissueloc/blob/master/tissueloc/locate_tissue.py
-(Pingjun Chen, MIT License, 2018) and uses otsu thresholding. The tissue masks are saved in one-channel tif format 
+(Pingjun Chen, MIT License, 2018) and uses otsu thresholding. The tissue masks are saved in a pyramidal tif format 
 with 0=background, 1=tissue (not readable by openslide as it can't read one-channel tifs).
 You can create your own background masks as normal images, and convert them to tifs with this script from wholeslidedata:
 `wholeslidedata/accessories/asap/convert_image.py`.

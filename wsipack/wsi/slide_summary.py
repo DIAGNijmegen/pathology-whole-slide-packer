@@ -3,15 +3,14 @@ import getpass
 from pathlib import Path
 
 import pandas as pd
-from tqdm import tqdm
 
-from wsipack.wsi.wsd_image import ImageReader
 from wsipack.utils.cool_utils import can_open_file, ensure_dir_exists, write_yaml_dict
 from wsipack.utils.df_utils import print_df, df_save
 from wsipack.utils.files_utils import FilesInfo
 from wsipack.utils.path_utils import PathUtils
 from wsipack.utils.cool_utils import df_row_to_dict, get_dir_size, get_file_size
 from wsipack.wsi.contour_utils import px_to_mm2
+from wsipack.wsi.wsi_read import ImageReader, create_reader
 
 
 class SlidesInfo(FilesInfo):
@@ -44,9 +43,9 @@ def create_slides_info_summary(slide_dir, out_dir=None, overwrite=False, spacing
         if i%100==0: print('%d/%d' % (i, len(slides)))
         name = wsi_path.stem
         try:
-            reader = ImageReader(str(wsi_path), spacing_tolerance=spacing_tolerance)
+            reader = create_reader(str(wsi_path), spacing_tolerance=spacing_tolerance)
             if reader.spacings[0] is None:
-                print('skipping slide without spacings' % str(wsi_path))
+                print('skipping slide without spacings %s' % str(wsi_path))
                 failed.append(wsi_path)
                 continue
         except Exception as ex:

@@ -9,16 +9,16 @@ from time import sleep
 from tqdm import tqdm
 from wsipack.utils.files_utils import create_pathes_csv
 from wsipack.utils.flexparse import FlexArgumentParser
+from wsipack.wsi.asap_writer import ArrayImageWriter
 from wsipack.wsi.resize_masks import resize_mask
 #pyvips must be imported before multiresolutionimageinterface otherwise libMagickCore error!
 from wsipack.utils.signal_utils import ExitHandler
 from wsipack.pack_annos import pack_annos, allowed_spacings
-from wsipack.wsi.wsd_image import ImageReader, PixelSpacingLevelError
-from wsipack.wsi.wsd_image import ArrayImageWriter
 
 from wsipack.utils.asap_links import make_asap_link
 from wsipack.utils.cool_utils import *
 from wsipack.utils.path_utils import get_corresponding_pathes, get_path_named_like, get_matching_pathes, PathUtils
+from wsipack.wsi.wsi_read import ImageReader, create_reader, InvalidSpacingError
 from wsipack.wsi.wsi_utils import create_thumbnail
 
 from wsipack.wsi.contour_utils import find_contours, px_to_mm2, cmp_shape_spacing_factor
@@ -46,7 +46,7 @@ def _rpack_exp():
 
 def _read_content(mask_path, spacing):
     """ return content and factor. coords0=coords*factor"""
-    reader = ImageReader(str(mask_path))
+    reader = create_reader(str(mask_path))
     content = reader.content(spacing)
     spacing = reader.refine(spacing)
     factor = spacing/reader.spacings[0]
@@ -68,7 +68,7 @@ def _contours_for_boxes(boxes):
 def _create_wsi_reader(wsi_path, spacing, cache_dir='./cache', spacing_tolerance=0.25):
     """ creates the reader, converts the wsi, if spacing is missing """
     # todo cache
-    reader = ImageReader(wsi_path, spacing_tolerance=spacing_tolerance)
+    reader = create_reader(wsi_path, spacing_tolerance=spacing_tolerance)
     wsi_out_spacing = reader.refine(spacing)
     return reader
 
@@ -98,10 +98,10 @@ def _upscale_masks(wsi_name_path_map, wsi_name_mask_map, mask_spacing, cache_dir
      return map name->mask_spacing """
     mask_spacings_map = {}
     for name,mpath in wsi_name_mask_map.copy().items():
-        mreader = ImageReader(mpath, spacing_tolerance=spacing_tolerance)
+        mreader = create_reader(mpath, spacing_tolerance=spacing_tolerance)
         try:
             mask_spacing = mreader.refine(mask_spacing)
-        except PixelSpacingLevelError as ex:
+        except InvalidSpacingError as ex:
             if cache_dir is None: raise ValueError('upscale masks requires cache_dir')
             mkdir(cache_dir)
             print('upsaling %s to spacing %f' % (str(mpath), mask_spacing))
@@ -122,7 +122,7 @@ def _get_tissue_masks_out_dir(out_dir, masks_out_dir=None, tissue_masks_dir_name
 
 def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name=None, cache_dir=None,
                processing_spacing=4, mask_spacing=4, min_area=0.01, tile_size=512, overwrite=False, orig_anno_dir=None,
-               packed_anno_dir=None, tissue_masks_dir_name='tissue_masks', packed_dir_name='packed',
+               packed_anno_dir=None, tissue_masks_dir_name='tissue_masks', packed_dir_name='images',
                box_margin=1, thumbnails=True, mem_slide=False,
                spacing_tolerance=0.3, clear_locks=False, mask_label=None, nolinks=False,
                # out_format='tif', writer='asap'
@@ -131,7 +131,7 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
     #     raise ValueError('unkonwn writer %s' % writer)
     # is_tif = 'tif' in out_format
     if spacing is None: #take the spacing from the first slide
-        reader = ImageReader(wsi_pathes[0])
+        reader = create_reader(wsi_pathes[0])
         spacing = reader.spacings[level]
         reader.close()
     elif spacing not in allowed_spacings or processing_spacing not in allowed_spacings or mask_spacing not in allowed_spacings:
@@ -276,11 +276,12 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
 
             runtimer.start()
             reader = all_boxes_readers[i]
-            rshape = reader.shapes[reader.level(spacing)]
+            rshapex, rshapey = reader.shapes[reader.level(spacing)]
             orig_box = all_boxes_out_sp[i] #col(x), row(y), width, height
             if orig_box[2] + orig_box[3] < 1536:
                 slide_arr[pbox[1]:pbox[1]+pbox[3],pbox[0]:pbox[0]+pbox[2]] =\
-                    reader.read(spacing, int(orig_box[1]),int(orig_box[0]),int(orig_box[3]),int(orig_box[2]))
+                    reader.read(spacing=spacing, y=int(orig_box[1]),x=int(orig_box[0]),
+                                height=int(orig_box[3]),width=int(orig_box[2]))
             else:
                 counter = 0
                 for xd in range(int(np.ceil(orig_box[2]/tile_size))):
@@ -291,15 +292,15 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
                         src_row = int(orig_box[1]+yd*tile_size)
                         src_col = int(orig_box[0]+xd*tile_size)
 
-                        if src_row >= rshape[0] or src_col >= rshape[1]:
+                        if src_row >= rshapey or src_col >= rshapex:
                             #due to the box margin it can be that row/col can go beyond slide borders
                             #which can cause an overflow error in asap when it tries to start reading
                             #from outside of the slide
                             continue
 
-                        tile = reader.read(spacing, src_row, src_col,
-                                        min(tile_size, int(orig_box[3])-yd*tile_size),
-                                        min(tile_size, int(orig_box[2])-xd*tile_size))
+                        tile = reader.read(spacing=spacing, y=src_row, x=src_col,
+                                        height=min(tile_size, int(orig_box[3])-yd*tile_size),
+                                        width=min(tile_size, int(orig_box[2])-xd*tile_size))
                         tar_row = int(pbox[1]+yd*tile_size)
                         tar_col = int(pbox[0]+xd*tile_size)
                         # print('src: (%d, %d), tar: (%d, %d), tile: (%d, %d), dtype: %s' % \
@@ -361,7 +362,7 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         mask_path_reader_map = {}
         for mp in all_mask_pathes:
             if mp not in mask_path_reader_map:
-                mask_path_reader_map[mp] = ImageReader(mp, spacing_tolerance=spacing_tolerance)
+                mask_path_reader_map[mp] = create_reader(mp, spacing_tolerance=spacing_tolerance)
                 mspacings.append(mask_path_reader_map[mp].refine(mask_spacing)) #should be very similar
         # mspacing = np.mean(mspacings) #if they are different, will probably result in out of bound errors for the mask
         # mask_out_factor = mspacing/processing_spacing
@@ -382,8 +383,8 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
             col_up = pbox[0] + pbox[2]
             if row_up > mask_arr.shape[0] or col_up > mask_arr.shape[1]:
                 raise ValueError('mask ind out of bound: (%d, %d), mask:' % (row_up, col_up), mask_arr.shape[:2])
-            tile = mreader.read(mask_spacing, int(orig_box_mask_sp[1]), int(orig_box_mask_sp[0]),
-                                int(orig_box_mask_sp[3]), int(orig_box_mask_sp[2])).astype(np.uint8)
+            tile = mreader.read(spacing=mask_spacing, y=int(orig_box_mask_sp[1]), x=int(orig_box_mask_sp[0]),
+                                height=int(orig_box_mask_sp[3]), width=int(orig_box_mask_sp[2])).astype(np.uint8)
             if tile.shape[0]!= (row_up - pbox[1]) or tile.shape[1] != (col_up - pbox[0]):
                 raise ValueError('wrong tile size:', tile.shape, 'pbox:', pbox, 'origbox:', orig_box)
             mask_arr[pbox[1]:row_up, pbox[0]:col_up] = tile
@@ -518,7 +519,7 @@ def _pack_slide_wrapper(wsi_pathes, **kwargs):
     except:
         return str(wsi_pathes)+str(sys.exc_info())
 
-def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='packed', path_col='path', mask_col='mask_path',
+def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='images', path_col='path', mask_col='mask_path',
                 mask_dir=None, random_order=False, cpus=0, overwrite=False, tissue_masks_dir_name='tissue_masks',
                 check_previous_params=False, cache_dir=None,
                 anno_dir=None, anno_out_dir=None, anno_out_dir_prefix=None, **kwargs):
@@ -527,6 +528,7 @@ def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='packed',
     if cache_dir is None:
         cache_dir = out_dir/'cache'
     out_dir_packed = out_dir/packed_dir_name
+    mkdir(out_dir_packed)
     param_info = ParamInfo(out_dir, filename='pack_args.yaml', overwrite=not check_previous_params)
     param_info.save(**kwargs)
 
@@ -537,7 +539,7 @@ def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='packed',
     elif data.endswith('xlsx'):
         df = pd.read_excel(data)
     else:
-        wsi_pathes = PathUtils.list_pathes(data, ending=['svs','tif','mrxs', 'ndpi'], ret='str', sort=True)
+        wsi_pathes = PathUtils.list_pathes(data, ending=['svs','tif', 'tiff', 'mrxs', 'ndpi', 'dicom'], ret='str', sort=True)
         names = [Path(wp).stem for wp in wsi_pathes]
         df = pd.DataFrame({packed_name_col:names, path_col:wsi_pathes})
     if packed_name_col not in df:
@@ -557,7 +559,7 @@ def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='packed',
     if mask_col not in df:
         if mask_dir is None: #TODO: just throw an error
             mask_dirs = []
-            wsi_dirs = [str(Path(p).parent) for p in df.path]
+            wsi_dirs = [str(Path(p).parent) for p in df[path_col]]
             wsi_dirs = list(set(wsi_dirs))
             for wdir in wsi_dirs.copy():
                 pot_mask_dirs = [wdir+'_'+tissue_masks_dir_name, Path(wdir).parent/tissue_masks_dir_name,

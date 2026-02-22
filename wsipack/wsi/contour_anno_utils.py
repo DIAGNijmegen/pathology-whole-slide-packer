@@ -64,10 +64,10 @@ def write_anno_for_contours(contours, anno_path=None, wsi_path=None, names=None,
                     names[group] = [''] * len(cnts)
                 final_names = []
                 for c,cnt_area in enumerate(areas):
-                    fomrat = '_area_%.3f'
+                    formatting = '_area_%.3f'
                     if cnt_area < 1e-3:
-                        fomrat = '_area_%.2e'
-                    final_names.append(names[group][c] + fomrat % cnt_area)
+                        formatting = '_area_%.2e'
+                    final_names.append(names[group][c] + formatting % cnt_area)
                 names[group] = final_names
 
     if anno_colors is None:

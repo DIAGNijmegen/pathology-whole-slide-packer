@@ -3,7 +3,7 @@
 # MIT License Copyright (c) 2018 Pingjun Chen
 
 ## Changes: output asap tif masks, support for spacing parameter
-## Note: fat is sometimes not recognized
+## Note: fat and faint stroma are may not be detected
 
 import argparse
 import sys
@@ -11,6 +11,10 @@ from pathlib import Path
 
 from scipy.ndimage import binary_fill_holes
 from skimage import filters
+
+from wsipack.wsi.asap_writer import ArrayImageWriter
+from wsipack.wsi.wsi_read import ImageReader, create_reader
+
 try:
     from skimage import img_as_ubyte
 except:
@@ -26,7 +30,6 @@ from tqdm import tqdm
 from wsipack.utils.cool_utils import mkdir
 from wsipack.utils.path_utils import PathUtils
 from wsipack.wsi.contour_utils import mm2_to_px
-from wsipack.wsi.wsd_image import ArrayImageWriter, ImageReader
 
 
 def select_slide_level(slide_path, max_size=2048):
@@ -244,24 +247,33 @@ def locate_tissue(slide_path,
 
 ########################### additional functions
 
-def create_tissue_mask(slide_path, spacing=None, level=None, out_path=None, overwrite=False, min_area=0):
+def create_tissue_mask(slide_path, spacing=None, level=None, out_path=None, overwrite=False, min_area=0, ignore_err=False):
     if spacing is None and level is None:
         raise ValueError('specify either spacing or level')
     if out_path is not None and Path(out_path).exists() and not overwrite:
         print('not overwriting existing %s' % str(out_path))
         return
-    reader = ImageReader(slide_path)
-    if level is None:
-        level = reader.level(spacing)
-    spacing = reader.spacings[level]
-    reader.close()
 
-    min_tissue_size = mm2_to_px(min_area, spacing=spacing)
-    img, mask, factor = locate_tissue(str(slide_path), s_level=level, min_tissue_size=min_tissue_size)
+    try:
+        reader = create_reader(slide_path)
+        if level is None:
+            level = reader.level(spacing)
+        spacing = reader.spacings[level]
+        reader.close()
 
-    if out_path is not None:
-        _write_tissue_mask(mask, out_path=out_path, spacing=spacing)
-    return mask, spacing
+        min_tissue_size = mm2_to_px(min_area, spacing=spacing)
+        img, mask, factor = locate_tissue(str(slide_path), s_level=level, min_tissue_size=min_tissue_size)
+
+        if out_path is not None:
+            _write_tissue_mask(mask, out_path=out_path, spacing=spacing)
+        return mask, spacing
+    except:
+        if ignore_err:
+            print('failed to create mask for %s' % str(slide_path))
+            print(sys.exc_info())
+            return None, None
+        else:
+            raise
 
 def _write_tissue_mask(mask, spacing, out_path):
     out_dir = Path(out_path).parent
@@ -270,7 +282,7 @@ def _write_tissue_mask(mask, spacing, out_path):
     writer.write_array(mask, out_path, spacing=spacing)
 
 def create_tissue_masks(slide_dir, out_dir, spacing=4, level=None, wsi_suffix=['tif', 'tiff', 'svs', 'ndpi', 'mrxs'],
-                        out_suffix='_tissue', ignore_err=True, **kwargs):
+                        out_suffix='_tissue', **kwargs):
     slide_pathes = PathUtils.list_pathes(slide_dir, ending=wsi_suffix)
     print('creating %d tissue masks' % len(slide_pathes))
     if len(slide_pathes) == 0:
@@ -279,14 +291,6 @@ def create_tissue_masks(slide_dir, out_dir, spacing=4, level=None, wsi_suffix=['
         out_suffix = ''
     for sp in tqdm(slide_pathes):
         out_path = Path(out_dir)/(sp.stem+out_suffix+'.tif')
-        try:
-            create_tissue_mask(sp, out_path=out_path, spacing=spacing, level=level, **kwargs)
-        except Exception as e:
-            print('failed %s' % str(sp))
-            if ignore_err:
-                print(e)
-            else:
-                raise e
         create_tissue_mask(sp, out_path=out_path, spacing=spacing, level=level, **kwargs)
     print('Done!')
 

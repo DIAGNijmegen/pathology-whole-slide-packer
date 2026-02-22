@@ -10,12 +10,12 @@ from wsipack.utils.cool_utils import ensure_dir_exists, is_iterable, take_closes
 from wsipack.utils.flexparse import FlexArgumentParser
 from wsipack.utils.path_utils import PathUtils, get_path_named_like
 from wsipack.wsi.anno_utils import AsapAnno
-from wsipack.wsi.wsd_image import ImageReader
+from wsipack.wsi.wsi_read import create_reader
 
 allowed_spacings = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 
 def _get_slide_spacing(path):
-    reader = ImageReader(str(path))
+    reader = create_reader(str(path))
     spacing = reader.spacings[0]
     reader.close()
     return spacing
