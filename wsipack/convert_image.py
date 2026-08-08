@@ -5,19 +5,11 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from wsipack.utils.cool_utils import mkdir
+from wsipack.utils.cool_utils import mkdir, take_closest_number_index
 from wsipack.utils.path_utils import PathUtils
-from wsipack.wsi.asap_writer import AsapMaskWriter, AsapImageWriter
+from wsipack.wsi.asap_writer import AsapMaskWriter, AsapImageWriter, ArrayImageWriter
 from wsipack.wsi.wsi_read import create_reader
 
-
-def take_closest_number(l, number):
-    return min(l, key=lambda x: abs(x - number))
-
-def take_closest_number_index(l, number):
-    closest = take_closest_number(l, number)
-    for ind, val in enumerate(l):
-        if val==closest: return ind
 
 def save_normal_image_as_tif(path, out_path, spacing, overwrite=False):
     """ saves a normal image (png, jpeg) as pyramidal tif """
@@ -31,30 +23,10 @@ def save_normal_image_as_tif(path, out_path, spacing, overwrite=False):
     save_array_as_image(arr, path=out_path, spacing=spacing)
 
 def save_array_as_image(arr, path, spacing, tile_size=512):
-    """ saves an array as pyramidal tif """
-    if min(arr.shape[:2])<tile_size:
-        tile_size = take_closest_number([8, 16, 32, 64, 128, 256], min(arr.shape[:2]))
-    if len(arr.shape)==2:
-        arr = arr[:,:,None]
-        writer = AsapMaskWriter()
-    else:
-        writer = AsapImageWriter()
-    shape = arr.shape
-    writer.write(
-        path=str(path), spacing=spacing, dimensions=(shape[1], shape[0]),
-        tile_shape=(tile_size, tile_size),
-    )
-
-    for col in range(0, shape[1]+tile_size, tile_size): #+tile_size if array not divisible by tile_size
-        for row in range(0, shape[0]+tile_size, tile_size):
-            tile = arr[row:row+tile_size, col:col+tile_size]
-            if len(tile)==0 or 0 in tile.shape: continue #for the edge-case
-            if tile.shape[0]!=tile_size or tile.shape[1]!=tile_size:
-                pad = ((0, tile_size-tile.shape[0]),(0, tile_size-tile.shape[1]),(0,0))
-                tile = np.pad(tile, pad, mode='constant')
-            writer.write_tile(tile=tile, coordinates=(col,row))  #col,row (x,y)
-    writer.save()
-
+    if arr.ndim == 3 and arr.shape[-1] == 4:
+        arr = arr[..., :3]  # drop alpha, AsapImageWriter expects RGB
+    writer = ArrayImageWriter(tile_size=tile_size)
+    writer.write_array(arr=arr, path=path, spacing=spacing)
 
 def save_normal_image_as_mask(path, slide_path, out_path, overwrite=False):
     """ saves an image-mask (png, jpeg) as pyramidal tif for a given slide """
@@ -71,7 +43,7 @@ def save_normal_image_as_mask(path, slide_path, out_path, overwrite=False):
     h,w = mask.height, mask.width
     mask.close()
 
-    heights = [hw[0] for hw in shapes]
+    heights = [hw[1] for hw in shapes]
     level = take_closest_number_index(heights, h)
     print('for mask shape(%d,%d) closest level %d with spacing  %.3f, shape %s' % \
           (h, w, level, spacings[level], str(shapes[level])))
@@ -100,13 +72,8 @@ def _resolve_inputs(data, path_col='path'):
     return df
 
 
-def _process_args_tif(args):
-    print('convert images to tif with args:', args)
-    data = args.pop('data')
-    out_dir = args.pop('out_dir')
-    path_col = args.pop('path_col')
-    spacing = args.pop('spacing')
-    overwrite = args.pop('overwrite')
+def _process_args_tif(data, out_dir, path_col, spacing, overwrite):
+    print('convert images to tif')
     mkdir(out_dir)
 
     df = _resolve_inputs(data, path_col=path_col)
@@ -121,15 +88,8 @@ def _process_args_tif(args):
     print('Done!')
 
 
-def _process_args_mask(args):
-    print('convert masks to tif with args:', args)
-    data = args.pop('data')
-    out_dir = args.pop('out_dir')
-    path_col = args.pop('path_col')
-    slide_path = args.pop('slide_path')
-    slide_col = args.pop('slide_col')
-    slide_dir = args.pop('slide_dir')
-    overwrite = args.pop('overwrite')
+def _process_args_mask(data, out_dir, path_col, slide_path, slide_col, slide_dir, overwrite):
+    print('convert masks to tif')
     mkdir(out_dir)
 
     df = _resolve_inputs(data, path_col=path_col)
@@ -195,9 +155,9 @@ def main():
     mode = args.pop('mode')
 
     if mode == 'tif':
-        _process_args_tif(args)
+        _process_args_tif(**args)
     elif mode == 'mask':
-        _process_args_mask(args)
+        _process_args_mask(**args)
 
 
 if __name__ == '__main__':
