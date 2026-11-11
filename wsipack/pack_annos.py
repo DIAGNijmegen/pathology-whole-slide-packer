@@ -21,10 +21,10 @@ def _get_slide_spacing(path):
     return spacing
 
 
-def pack_annos(annos_dir, packed_images_dir, wsi_dir_or_pathes, out_dir=None, out_dir_prefix=None, overwrite=False, nolinks=False):
-    print('pack annos: annos_dir=%s, packed_images_dir=%s' % (annos_dir, packed_images_dir))
+def pack_annos(anno_dir, packed_images_dir, wsi_dir_or_pathes, out_dir=None, out_dir_prefix=None, overwrite=False, nolinks=False):
+    print('pack annos: anno_dir=%s, packed_images_dir=%s' % (anno_dir, packed_images_dir))
     # print('annotation names must match the slide name')
-    anno_dir_name = Path(annos_dir).name if out_dir_prefix is None else out_dir_prefix
+    anno_dir_name = Path(anno_dir).name if out_dir_prefix is None else out_dir_prefix
     packed_images_dir = Path(packed_images_dir)
     packed_dir = packed_images_dir.parent
     if out_dir is None:
@@ -38,7 +38,7 @@ def pack_annos(annos_dir, packed_images_dir, wsi_dir_or_pathes, out_dir=None, ou
 
     ensure_dir_exists(out_dir_packed_annos)
 
-    anno_pathes = PathUtils.list_pathes(annos_dir, ending='xml')
+    anno_pathes = PathUtils.list_pathes(anno_dir, ending='xml')
     if is_iterable(wsi_dir_or_pathes) and Path(wsi_dir_or_pathes[0]).exists():
         wsi_pathes = wsi_dir_or_pathes
     else:
@@ -124,9 +124,6 @@ def pack_annos(annos_dir, packed_images_dir, wsi_dir_or_pathes, out_dir=None, ou
 def _pack_anno(anno_path, roi_anno_path, packed_anno_path, wsi_spacing, packed_spacing, wsi_name=None):
     if wsi_name is None:
         wsi_name = Path(anno_path).stem
-    # packed_path = Path(packed_path)
-    # packed_anno_dir = packed_path.parent/'images_packed_anno'
-    # packed_anno_path = packed_anno_dir/(packed_path.stem+'.xml')
 
     spacing_factor = wsi_spacing/packed_spacing
     #read annos etc.
@@ -140,10 +137,14 @@ def _pack_anno(anno_path, roi_anno_path, packed_anno_path, wsi_spacing, packed_s
     packed_roi_annos = packed_anno.get_annos_in_group(wsi_name)
 
     all_found_annos = []
+    moved_annos = []
     for packed_roi in packed_roi_annos:
         orig_roi = roi_anno.get_anno_by_name(packed_roi.name)
         found_annos = anno.get_annos_overlapping_with(orig_roi)
         all_found_annos.extend(found_annos)
+        #shift copies, so that the following rois are matched against the original coordinates
+        found_annos = deepcopy(found_annos)
+        moved_annos.extend(found_annos)
 
         shift0 = orig_roi.coords[0]
         anno.shift_annos(found_annos, -shift0[0], -shift0[1])
@@ -158,9 +159,8 @@ def _pack_anno(anno_path, roi_anno_path, packed_anno_path, wsi_spacing, packed_s
         print('%d/%d annos out of rois!!' % (len(unmatched_annos), len(all_found_annos)))
         unma_anno = deepcopy(anno)
         unma_anno.remove_annos(all_found_annos)
-        #remove from the (packed) anno
-        anno.remove_annos(unmatched_annos)
 
+    anno.annos = moved_annos
     return anno, unma_anno
 
 

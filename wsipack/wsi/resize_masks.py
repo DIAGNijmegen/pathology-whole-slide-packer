@@ -16,7 +16,10 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
         raise ValueError('out_path %s may not overlap with mask or slide' % str(out_path))
     if not overwrite and Path(out_path).exists():
         print('not overwriting %s' % str(out_path))
-        return
+        reader = create_reader(str(out_path), spacing_tolerance=spacing_tolerance)
+        mask_spacing = reader.refine(spacing)
+        reader.close()
+        return mask_spacing
 
     if not Path(mask_path).exists():
         raise ValueError('mask %s doesnt exist' % mask_path)
@@ -48,7 +51,7 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
             mask -= 1
             mask[mask<0] = 0
 
-        mask = cv2.resize(mask, (shape[1], shape[0]))
+        mask = cv2.resize(mask, (int(shape[0]), int(shape[1]))) #shape and cv2 dsize are both (width, height)
         # from dptshared.cool_utils import showim
         # showim(mask)
         print('writing %s...' % str(out_path))

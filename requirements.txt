@@ -4,6 +4,7 @@ Shapely >= 1.7.1
 lxml >= 4.8.0
 matplotlib >= 3.6.2
 opencv_python_headless >= 4.5.4.60
+openpyxl
 openslide_python
 pandas >= 1.4.2
 rectangle_packer == 2.0.2

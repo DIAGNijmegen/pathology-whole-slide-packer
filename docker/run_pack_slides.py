@@ -54,8 +54,9 @@ def main(slide_dir, spacing, mask_dir=None, out_dir='/output/images/packed',
     else:
         slides, masks = get_corresponding_pathes(slides, mask_pathes, must_all_match=True, take_shortest=True)
 
-    pack_slide(slides, masks, out_dir=tmp_dir, spacing=spacing, level=level)
-    packed_slides_dir = Path(tmp_dir)/'packed'
+    packed_dir_name = 'images'
+    pack_slide(slides, masks, out_dir=tmp_dir, spacing=spacing, level=level, packed_dir_name=packed_dir_name)
+    packed_slides_dir = Path(tmp_dir)/packed_dir_name
     created_packed = PathUtils.list_pathes(packed_slides_dir, ending='tif')
     print('copying %d packed from %s to %s' % (len(created_packed), packed_slides_dir, out_dir))
     mkdir(out_dir)
