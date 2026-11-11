@@ -49,8 +49,7 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
 
         if decr:
             print('decrementing mask with vals %s' % str(np.unique(mask)))
-            mask -= 1
-            mask[mask<0] = 0
+            mask[mask>0] -= 1 #uint8, subtracting from 0 would wrap to 255
 
         mask = cv2.resize(mask, (int(shape[0]), int(shape[1])), interpolation=cv2.INTER_NEAREST) #shape and cv2 dsize are both (width, height)
         # from dptshared.cool_utils import showim

@@ -195,8 +195,6 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         cache_dir = Path(out_dir)/'cache'
     mask_spacing_map = _upscale_masks(wsi_name_path_map, wsi_name_mask_map, mask_spacing, cache_dir, spacing_tolerance=spacing_tolerance)
 
-    # out_to_mask_factor = spacing/mask_spacing
-    out_to_mask_factor = spacing/max(mask_spacing_map.values())
     processing_to_mask_factor = processing_spacing/mask_spacing
     try:
         skipped_bad_sp = []
@@ -358,6 +356,7 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
         # mask_height = int(round(packed_height/np.mean(all_out_factors)))
         # mask_width = int(round(packed_width/np.mean(all_out_factors)))
 
+        out_to_mask_factor = out_spacing/max(mask_spacing_map.values())
         mask_height = int(round(packed_height*out_to_mask_factor))
         mask_width = int(round(packed_width*out_to_mask_factor))
         print('packed size: (%d, %d), mask size: (%d, %d)' % (packed_height, packed_width, mask_height, mask_width))
