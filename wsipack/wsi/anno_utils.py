@@ -121,7 +121,7 @@ class Anno(object):
                (self.name, self.type, self.group, self.color)
 
     def __eq__(self, other):
-        return str(self)==str(other) and self.coords==other.coords
+        return str(self)==str(other) and np.array_equal(self.coords, other.coords)
 
     @staticmethod
     def create_rectangle_from_xywh(name, group, x, y, w, h, color='#000000'):
@@ -449,12 +449,10 @@ def scale_anno_coords(anno_path, out_path, factor=None, wsi_path=None, spacing=N
             raise ValueError('requires wsi_path if spacing is to be used')
         if not Path(wsi_path).exists():
             raise ValueError('wsi %s doesnt exist' % str(wsi_path))
-    reader = create_reader(wsi_path)
-    spacing = reader.refine(spacing)
-    factor = reader.spacings[0]/spacing
-    reader.close()
-    if not (factor*100)%2:
-        print('warn: factor %.3f for %s not //2' % (factor, Path(wsi_path).stem))
+        reader = create_reader(wsi_path)
+        spacing = reader.refine(spacing)
+        factor = reader.spacings[0]/spacing
+        reader.close()
 
     ensure_dir_exists(Path(out_path).parent)
     anno_path = Path(anno_path)
@@ -527,7 +525,7 @@ def unshift_anno_coords(anno_path, out_dir, suffix_type='__', overwrite=False):
         else: raise ValueError('unknown annotation crop naming suffix type %s' % suffix_type)
         parts = anno_path.stem.split('_')
         parts = [p for p in parts if len(p)>0] #skimp emtpy lines
-        name = '_'.join(parts[:-first_ind])
+        name = '_'.join(parts[:first_ind])
 
     coord = np.array([int(parts[first_ind]), int(parts[first_ind+1])])
     out_path = Path(out_dir)/(name+'.xml')

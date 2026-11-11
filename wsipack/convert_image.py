@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -49,6 +50,12 @@ def save_normal_image_as_mask(path, slide_path, out_path, overwrite=False):
           (h, w, level, spacings[level], str(shapes[level])))
 
     spacing = spacings[level]
+    level_shape = shapes[level] #(width, height)
+    if (w, h) != level_shape:
+        print('resizing mask from (%d,%d) to level size %s' % (w, h, str(level_shape)))
+        if mask_arr.dtype == bool: #mode '1' pngs, cv2 can't resize bool arrays
+            mask_arr = mask_arr.astype(np.uint8)
+        mask_arr = cv2.resize(mask_arr, level_shape, interpolation=cv2.INTER_NEAREST)
     return save_array_as_image(mask_arr, spacing=spacing, path=out_path)
 
 

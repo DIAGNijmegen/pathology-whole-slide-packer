@@ -43,7 +43,7 @@ def main(slide_dir, spacing, mask_dir=None, out_dir='/output/images/packed',
         print('no masks found')
         mask_pathes = None
     if mask_pathes is None:
-        mask_dir = tmp_dir+'/tissue_masks'
+        mask_dir = tmp_dir+'/input_tissue_masks' #separate from the packed masks, which are copied to the output
         print('creating tissue masks for %s in %s' % (slide_dir, mask_dir))
         create_tissue_masks(slide_dir, mask_dir, spacing=spacing, level=level,
                             wsi_suffix=['tif', 'tiff', 'svs', 'ndpi', 'mrxs'])

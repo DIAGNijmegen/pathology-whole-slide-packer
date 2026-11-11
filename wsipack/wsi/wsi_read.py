@@ -199,8 +199,7 @@ class ImageReader(object):
             cache_target = self._cache_path if os.path.splitext(self._image_path)[1].lower() == os.path.splitext(self._cache_path)[
                 1].lower() else os.path.join(self._cache_path, os.path.basename(self._image_path))
             self._cache_path = cache_target
-            # cached = copy_image(source_path=self._image_path, target_path=self._cache_path, overwrite=False)
-            cached = copy_slide(self._image_path, self._cache_path, overwrite=False)
+            cached = copy_slide(self._image_path, self._cache_path)
             if self._verbose and cached:
                 print('cached %s to %s' % (self._image_path,self._cache_path), flush=True)
 

@@ -1,4 +1,5 @@
-import shutil, tqdm
+import shutil
+from tqdm import tqdm
 from pathlib import Path
 import numpy as np
 
@@ -51,7 +52,7 @@ def resize_mask(mask_path, wsi_path, out_path, spacing, overwrite=False, decr=Fa
             mask -= 1
             mask[mask<0] = 0
 
-        mask = cv2.resize(mask, (int(shape[0]), int(shape[1]))) #shape and cv2 dsize are both (width, height)
+        mask = cv2.resize(mask, (int(shape[0]), int(shape[1])), interpolation=cv2.INTER_NEAREST) #shape and cv2 dsize are both (width, height)
         # from dptshared.cool_utils import showim
         # showim(mask)
         print('writing %s...' % str(out_path))

@@ -30,6 +30,8 @@ from wsipack.utils.geometry import merge_overlapping_bboxes
 
 print = print_mp
 
+MAX_MASK_SPACING_DIFF = 0.002 #relative, larger differences between mask and slide spacing misplace the tissue boxes
+
 
 def _rpack_exp():
 
@@ -45,13 +47,12 @@ def _rpack_exp():
     #[(0, 0), (58, 0), (289, 0), (289, 113)]
 
 def _read_content(mask_path, spacing):
-    """ return content and factor. coords0=coords*factor"""
+    """ return content and the actual spacing it was read at """
     reader = create_reader(str(mask_path))
     content = reader.content(spacing)
     spacing = reader.refine(spacing)
-    factor = spacing/reader.spacings[0]
     reader.close()
-    return content, factor
+    return content, spacing
 
 
 def _contours_for_boxes(boxes):
@@ -75,21 +76,21 @@ def _create_wsi_reader(wsi_path, spacing, cache_dir='./cache', spacing_tolerance
 
 def _create_slide_arr(packed_height, packed_width, cache_dir, name='slide_arr.dat',
                       dims=3, fill=255, dtype=np.uint8, mem_slide=False):
+    if dims==1:
+        shape =(packed_height, packed_width)
+    else:
+        shape =(packed_height, packed_width, dims)
     if mem_slide:
-        slide_arr = np.ones((packed_height, packed_width, 3), dtype=np.uint8) * fill
+        slide_arr = np.zeros(shape, dtype=dtype)
     else:
         mkdir(cache_dir)
         cache_path = str(Path(cache_dir)/name)
         print('creating slide_array... %s' % cache_path)
-        if dims==1:
-            shape =(packed_height, packed_width)
-        else:
-            shape =(packed_height, packed_width, dims)
         slide_arr = np.memmap(cache_path, dtype=dtype, mode='w+', shape=shape)
-        print('filling slide array..')
-        if fill is not None:
-            slide_arr.fill(fill)
-        print('slide_arr created')
+    print('filling slide array..')
+    if fill is not None:
+        slide_arr.fill(fill)
+    print('slide_arr created')
     return slide_arr
 
 
@@ -155,6 +156,9 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
     packed_anno_links_dir = packed_anno_dir+'_links'
 
     mask_pathes = [str(mp) for mp in mask_pathes]
+    stems = [Path(wp).stem for wp in wsi_pathes]
+    if len(set(stems)) != len(stems):
+        raise ValueError('slides with the same name can not be packed together: %s' % str(wsi_pathes))
     wsi_name_mask_map = {Path(wp).stem:mp for wp,mp in zip(wsi_pathes,mask_pathes)}
     wsi_name_path_map = {Path(wp).stem:wp for wp in wsi_pathes}
     wsi_names = list(sorted(wsi_name_path_map.keys()))
@@ -386,7 +390,7 @@ def pack_slide(wsi_pathes, mask_pathes, out_dir, spacing=None, level=0, out_name
             tile = mreader.read(spacing=mask_spacing, y=int(orig_box_mask_sp[1]), x=int(orig_box_mask_sp[0]),
                                 height=int(orig_box_mask_sp[3]), width=int(orig_box_mask_sp[2])).astype(np.uint8)
             if tile.shape[0]!= (row_up - pbox[1]) or tile.shape[1] != (col_up - pbox[0]):
-                raise ValueError('wrong tile size:', tile.shape, 'pbox:', pbox, 'origbox:', orig_box)
+                raise ValueError('wrong tile size:', tile.shape, 'pbox:', pbox, 'origbox:', orig_box_mask_sp)
             mask_arr[pbox[1]:row_up, pbox[0]:col_up] = tile
 
         if mask_arr.sum()==0:
@@ -471,7 +475,10 @@ def _create_box_names(boxes, areas, wsi_factor):
 
 def _create_tissue_boxes(mask_path, spacing, min_area=0, box_margin=0, mask_label=None, verbose=False):
     print('reading content from %s at spacing %.2f' % (str(mask_path), spacing))
-    content, _ = _read_content(mask_path, spacing)
+    content, mask_spacing = _read_content(mask_path, spacing)
+    if abs(mask_spacing - spacing) > MAX_MASK_SPACING_DIFF * spacing:
+        raise ValueError('mask %s has spacing %.4f, slide has %.4f, tissue boxes would be misplaced'
+                         % (str(mask_path), mask_spacing, spacing))
     print('finding contours for shape %s' % str(content.shape))
     if mask_label is None:
         contours = find_contours(content > 0)
@@ -503,6 +510,10 @@ def _create_tissue_boxes(mask_path, spacing, min_area=0, box_margin=0, mask_labe
 
     boxes = [cv.boundingRect(c) for c in large_contours]
     merge_overlapping_bboxes(boxes)
+    #merging changes the number and order of the boxes, sum the contour areas per merged box
+    large_areas = [sum(area for cnt, area in zip(large_contours, large_areas)
+                       if x <= cnt[0][0][0] < x+w and y <= cnt[0][0][1] < y+h)
+                   for x, y, w, h in boxes]
     boxes = np.array(boxes)
     boxes[:, 2] += box_margin
     boxes[:, 3] += box_margin
@@ -522,7 +533,7 @@ def _pack_slide_wrapper(wsi_pathes, **kwargs):
 def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='images', path_col='path', mask_col='mask_path',
                 mask_dir=None, random_order=False, cpus=0, overwrite=False, tissue_masks_dir_name='tissue_masks',
                 check_previous_params=False, cache_dir=None,
-                anno_dir=None, anno_out_dir=None, anno_out_dir_prefix=None, **kwargs):
+                anno_dir=None, anno_out_dir=None, anno_out_dir_prefix=None, nolinks=False, **kwargs):
     """ slide_pack_mapping: either csv-path or df with cols for packed_name, wsi path and optionally mask path """
     out_dir = Path(out_dir)
     if cache_dir is None:
@@ -614,7 +625,7 @@ def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='images',
         pack_params = dict(wsi_pathes=list(wsi_pathes_group), mask_pathes=list(mask_pathes_group),
                     packed_dir_name=packed_dir_name,
                     tissue_masks_dir_name=tissue_masks_dir_name, cache_dir=cache_dir,
-                    out_dir=out_dir, out_name=str(packed_name), overwrite=overwrite, **kwargs)
+                    out_dir=out_dir, out_name=str(packed_name), overwrite=overwrite, nolinks=nolinks, **kwargs)
         all_pack_params.append(pack_params)
 
     if random_order:
@@ -633,29 +644,32 @@ def pack_slides(data, out_dir, packed_name_col='name', packed_dir_name='images',
         print(failures)
 
     if len(all_pack_params)>0 and len(failures)==0:
-        if check_packed(out_dir_packed):
+        if check_packed(out_dir_packed, tissue_masks_dir_name=tissue_masks_dir_name):
             create_slides_info_summary(out_dir_packed, out_dir=out_dir/'slide_summary', overwrite=True)
             create_slides_info_summary(out_dir/tissue_masks_dir_name, overwrite=True)
+        else:
+            failures.append('packed slides without tissue masks in %s' % str(out_dir_packed))
 
     if anno_dir is not None:
         pack_annos(anno_dir, out_dir_packed, all_wsi_pathes,
-                   out_dir=anno_out_dir, out_dir_prefix=anno_out_dir_prefix, overwrite=overwrite)
+                   out_dir=anno_out_dir, out_dir_prefix=anno_out_dir_prefix, overwrite=overwrite, nolinks=nolinks)
 
     create_pathes_csv(out_dir_packed, out_path=out_dir/'pathes.csv')
     if cache_dir is not None:
         try:  os.rmdir(str(cache_dir));
         except: pass
     print('Done!')
+    return failures
 
 
-def check_packed(packed_image_dir):
+def check_packed(packed_image_dir, tissue_masks_dir_name='tissue_masks'):
     """ sometimes the slide is packed, but no tissue masks are created (crashed process?)
      For now, delete all those slides (to re-pack)
      packed_dir: directory with the packed results (seven dirs or so)
      return 1 if ok
      """
     packed_image_dir = Path(packed_image_dir)
-    tissue_dir = packed_image_dir.parent/'tissue_masks'
+    tissue_dir = packed_image_dir.parent/tissue_masks_dir_name
     print('checking for missing tissue masks in %s' % str(tissue_dir))
     if not tissue_dir.exists(): raise ValueError('no tissue dir %s' % str(tissue_dir))
     if not packed_image_dir.exists(): raise ValueError('no image dir %s' % str(packed_image_dir))
@@ -687,7 +701,7 @@ def main():
                                         'if None tries to find masks automatically looking for "tissue_masks"')
     parser.add_argument('--out_dir', type=str, required=True)
     parser.add_argument('--spacing', type=float, required=False)
-    parser.add_argument('--level', type=int, required=False)
+    parser.add_argument('--level', type=int, required=False, default=0, help='level to pack at, if no spacing is given')
     parser.add_argument('--processing_spacing', type=float, required=False, default=4, help='spacing at which the tissue is detected, 4 or 8 recommended')
     parser.add_argument('--mask_spacing', type=float, required=False, default=4)
     parser.add_argument('--min_area', type=float, required=False, default=0.4, help='min section tissue area in mm2')
@@ -708,7 +722,9 @@ def main():
     time.sleep(sleep)
 
     print('args:', args)
-    pack_slides(**args)
+    failures = pack_slides(**args)
+    if len(failures) > 0:
+        sys.exit(1)
 
 
 if __name__ == '__main__':

@@ -69,8 +69,7 @@ def create_slides_info_summary(slide_dir, out_dir=None, overwrite=False, spacing
                 has_sp_map[has_sp_str] = True
             except:
                 has_sp_map[has_sp_str] = False
-        width = reader.shapes[0][1]
-        height = reader.shapes[0][0]
+        width, height = reader.shapes[0]
         area = int(px_to_mm2(width * height, spacing=reader.spacings[0]))
 
         entries.append(dict(name=str(name), spacing=reader.spacings[0], width=width, height=height,

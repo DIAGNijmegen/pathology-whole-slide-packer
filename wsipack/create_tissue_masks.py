@@ -312,7 +312,7 @@ def main():
     parser = argparse.ArgumentParser(description="Create tissue masks")
     parser.add_argument("--wsi", help="slide path or directory containing slides", required=True)
     parser.add_argument("--out_dir", help="Output directory for the tissue masks", required=True)
-    parser.add_argument("--spacing", type=int, help="spacing in um/px (if not level)", required=False)
+    parser.add_argument("--spacing", type=float, help="spacing in um/px (if not level)", required=False)
     parser.add_argument("--level", type=int, help="level (if not spacing)", required=False)
     parser.add_argument("--min_area", type=float, help="minimal tissue area in mm²", required=False, default=0.05)
     parser.add_argument("--wsi_suffix", default="tif,svs,ndpi,mrxs,dicom", help="suffix of slides in slide_dir", required=False)

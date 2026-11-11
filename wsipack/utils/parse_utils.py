@@ -42,7 +42,7 @@ def parse_string(param_value, list_separator=','):
     elif is_string_float(param_value):
         parsed_value = float(param_value)
     elif is_string_boolean(param_value):
-        parsed_value = bool(param_value)
+        parsed_value = param_value.lower() == 'true'
     elif (len(param_value)>2 and param_value[0]=='[' and param_value[-1]==']'):
         parts = param_value[1:-1].split(',')
         parsed_value = [parse_string(part.strip()) for part in parts]

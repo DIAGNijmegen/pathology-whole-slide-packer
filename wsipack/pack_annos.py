@@ -158,7 +158,7 @@ def _pack_anno(anno_path, roi_anno_path, packed_anno_path, wsi_spacing, packed_s
     if len(unmatched_annos)>0:
         print('%d/%d annos out of rois!!' % (len(unmatched_annos), len(all_found_annos)))
         unma_anno = deepcopy(anno)
-        unma_anno.remove_annos(all_found_annos)
+        unma_anno.annos = deepcopy(unmatched_annos) #not remove_annos, which removes by name
 
     anno.annos = moved_annos
     return anno, unma_anno
@@ -167,10 +167,10 @@ def _pack_anno(anno_path, roi_anno_path, packed_anno_path, wsi_spacing, packed_s
 if __name__ == '__main__':
     parser = FlexArgumentParser()
     parser.add_argument('--anno_dir', type=str, required=True, help='asap annotations directory')
-    parser.add_argument('--packed_images_dir', type=str, required=True, default='directory with the packed images')
+    parser.add_argument('--packed_images_dir', type=str, required=True, help='directory with the packed images')
     parser.add_argument('--wsi_dir_or_pathes', type=str, required=True,
-                        default='directory with the original slides, necessary to determine the original spacings')
-    parser.add_argument('--out_dir', type=str, required=True, help='output directory, default is the parent of the packed images')
+                        help='directory with the original slides, necessary to determine the original spacings')
+    parser.add_argument('--out_dir', type=str, required=True, help='output directory')
     parser.add_argument('--nolinks', action='store_true', help='dont create asap links')
     parser.add_argument('--overwrite', action='store_true', help='overwrite existing results')
 

@@ -36,11 +36,12 @@ class FlexArgumentParser(argparse.ArgumentParser):
         known, unknown = self.parse_known_args(args=args, namespace=namespace)
         #add the unknown args as strings
         if unknown is not None:
-            for arg in unknown:
+            for i, arg in enumerate(unknown):
                 if arg.startswith(("-", "--")):
                     arg_name = arg.split('=')[0]
                     kwargs = {}
-                    if '=' in arg:
+                    #takes a value if given with '=' or followed by a value (e.g. '--key value')
+                    if '=' in arg or (i+1 < len(unknown) and not unknown[i+1].startswith('-')):
                         kwargs['type']=str
                     else:
                         kwargs['action'] = 'store_true'
